@@ -50,6 +50,8 @@ export DIR_VAR="/var"
 export DIR_MARKERS="${DIR_INST}/tce.installed"
 export DIR_SCRIPTS="${DIR_INST}/etc/init.d"
 
+export PATH_PKGCFG="/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"  # the default PKG_CONFIG_PATH value
+
 export DEP_MAKE_ALL='compiletc squashfs_tools rsync find_utils'	# compile-time deps list for all projects (e.g. compiletc, mksquashfs-tools, ...)
 
 export EXT_CODE='.${PACK}.all.code'				# [tgz file] package source code
@@ -83,22 +85,22 @@ if [ "$2" = 'i32' ]; then					# set default compile flags (which can be overwrit
 	EXPORTS="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
 		export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
 		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
 elif [ "$2" = 'i64' ]; then					# NOTE: additional flags can also be set in this variable as well (e.g. LC_CTYPE, QT_IM_MODULE, GTK_IM_MODULE, ...)
 	EXPORTS="export CFLAGS='-mtune=generic -Os -pipe'
 		export CXXFLAGS='-mtune=generic -Os -pipe'
 		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
 elif [ "$2" = 'r32' ]; then
 	EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
 		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
 		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
 elif [ "$2" = 'r64' ]; then
 	EXPORTS="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
 fi
 
 export DEBUG=0							# whether or not to show debug output during processing
@@ -255,8 +257,6 @@ package() {
 		[ ! -d "${DIR}.all" ] && mkdir "${DIR}.all" 2>>"$LOG"				# create a directory for all the files of a single package
 		cp -dpR "${DIR}/*" "${DIR}.all" 2>>"$LOG"					# copy all the compiled software into that directory
 		TEMP='all'									# store the directory to all files in a single package
-# UPDATED 2025/10/16
-#	if [ "$SORT" ] || [ ! "$PASS" ]; then							# if we were instructed to sort on this pass -OR- there is only one pass, then...
 	elif [ ! "$SPAK" ] && ( [ "$SORT" ] || [ ! "$PASS" ] ); then				# if we need separate packages -AND- (were instructed to sort on this pass -OR- there is only one pass), then...
 		cd "${DIR_DUMP}" || {								# change into the temp packaging directory
 			echo "Calling: cd \"$DIR_DUMP\"" >>"$LOG"
@@ -323,38 +323,37 @@ package() {
 		TEMP='bin dev doc drv gir lib loc'						# store all the directories the files were separated into
 	fi
 
-# MOVED 2025/10/16 - this was moved out of the bottom of the above 'if' since both conditions need to run this code
-		# NOTE: we should only apply ownership and permissions on the final pass!!!
-		if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then							# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
-			echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"	# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when TYPE=custom (e.g. FXwm)
-			for DIR in $NAMES; do
+	# NOTE: we should only apply ownership and permissions on the final pass!!!
+	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then							# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
+		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"	# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when TYPE=custom (e.g. FXwm)
+		for DIR in $NAMES; do
 # UPDATED 2025/10/17 - both 'if' statement can utilize this code block now
 #				for PACK in bin dev doc drv gir lib loc; do
-				for PACK in $TEMP; do
-					[ ! -d "${DIR_DUMP}/${DIR}.${PACK}" ] && continue	# if a directory is missing then there's no reason to process something that doesn't exist!
+			for PACK in $TEMP; do
+				[ ! -d "${DIR_DUMP}/${DIR}.${PACK}" ] && continue	# if a directory is missing then there's no reason to process something that doesn't exist!
 
-					cd "${DIR_DUMP}/${DIR}.${PACK}" 2>>"$LOG" || {		# change into the temp packaging directory
-						echo "Calling: cd \"${DIR_DUMP}/${DIR}.${PACK}\"" >>"$LOG"
-						echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
-						stop failed
-					}
-					find . \( -type f -exec chmod $PRM_FILES {} \; \) , \( -type d -exec chmod $PRM_DIRS {} \; \)				# update the permissions of all the package contents	https://stackoverflow.com/questions/3740152/how-do-i-set-chmod-for-a-folder-and-all-of-its-subfolders-and-files-in-linux-ubu
-					find ".${DIR_MARKERS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
-					find ".${DIR_SCRIPTS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
-					find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null			# update the permissions of all the libraries
-					find ".${DIR_INST}/lib64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
-					find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null					# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
-#					chmod -R $PRM_DIRS bin sbin usr/bin usr/sbin usr/local/bin usr/local/sbin 2>/dev/null					# update these directory contents to be executable
-					chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null				# update these directory contents to be executable
-					sudo chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>"$LOG" 2>&1								# update the ownership of all the package contents
-				done
+				cd "${DIR_DUMP}/${DIR}.${PACK}" 2>>"$LOG" || {		# change into the temp packaging directory
+					echo "Calling: cd \"${DIR_DUMP}/${DIR}.${PACK}\"" >>"$LOG"
+					echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
+					stop failed
+				}
+				find . \( -type f -exec chmod $PRM_FILES {} \; \) , \( -type d -exec chmod $PRM_DIRS {} \; \)				# update the permissions of all the package contents	https://stackoverflow.com/questions/3740152/how-do-i-set-chmod-for-a-folder-and-all-of-its-subfolders-and-files-in-linux-ubu
+				find ".${DIR_MARKERS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
+				find ".${DIR_SCRIPTS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
+				find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null			# update the permissions of all the libraries
+				find ".${DIR_INST}/lib64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
+				find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null					# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
+#				chmod -R $PRM_DIRS bin sbin usr/bin usr/sbin usr/local/bin usr/local/sbin 2>/dev/null					# update these directory contents to be executable
+				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null				# update these directory contents to be executable
+				sudo chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>"$LOG" 2>&1								# update the ownership of all the package contents
 			done
+		done
 
-			[ $DEBUG -gt 0 ] && {
-				echo -n "   DEBUG: Check the DIR_DUMP and DIR_TEMP directories and press any key... "
-				read
-			}
-		fi
+		[ $DEBUG -gt 0 ] && {
+			echo -n "   DEBUG: Check the DIR_DUMP and DIR_TEMP directories and press any key... "
+			read
+		}
+	fi
 
 
 
@@ -380,64 +379,61 @@ package() {
 		"${DIR_MAKE}/pre.package.${PASS}" 2>>"$LOG" || stop failed
 	}
 
-# MOVED 2025/10/16 - this was moved up to prevent this entire block from processing if the conditions aren't right (yet)
-#	if [ ! "$SKIP" ] || ( [ "$SKIP" ] && [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then		# if '-F' wasn't passed -OR- it was -and- we are on the last pass, then...
-		# store the package names that need to be processed (either NAME or directory names)	  NOTE: this has to be performed again incase additional directories were added/removed via a 'pre.package' script
-		[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"					# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
-		[ ! "$DIRS" ] && [ "$TRIM" ] && {						# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
-			NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
-			eval $SUDO mv "$NAME" "$NAMES" 2>>"$LOG"
-		}
-		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' | sort -u)"	# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+	# store the package names that need to be processed (either NAME or directory names)	  NOTE: this has to be performed again incase additional directories were added/removed via a 'pre.package' script
+	[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"					# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
+	[ ! "$DIRS" ] && [ "$TRIM" ] && {						# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
+		NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
+		eval $SUDO mv "$NAME" "$NAMES" 2>>"$LOG"
+	}
+	[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' | sort -u)"	# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 												# NOTE: list all contents | non-greedy sed to remove extension (e.g. .bin) | sort to remove duplicates
-		echo -e "\nCreating the various packages..." | tee -a "$LOG"
-		for DIR in $NAMES; do								# NOTE: the DIR variable will contain directory names, or the actual names of the packages - depending on configuration
+	echo -e "\nCreating the various packages..." | tee -a "$LOG"
+	for DIR in $NAMES; do								# NOTE: the DIR variable will contain directory names, or the actual names of the packages - depending on configuration
 # UPDATED 2025/10/17 - both 'if' statement can utilize this code block now
 #			for PACK in bin dev doc drv gir lib loc; do
-			for PACK in $TEMP; do
-				[ ! -d "${DIR}.${PACK}" ] && continue				# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
+		for PACK in $TEMP; do
+			[ ! -d "${DIR}.${PACK}" ] && continue				# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
 
-				eval TMP_DEPS="$EXT_DEPS"					# update these values if variables were included in their name
-				eval TMP_HASH="$EXT_HASH"
-				eval TMP_INFO="$EXT_INFO"
-				eval TMP_LIST="$EXT_LIST"
-				eval TMP_SOFT="$EXT_SOFT"
+			eval TMP_DEPS="$EXT_DEPS"					# update these values if variables were included in their name
+			eval TMP_HASH="$EXT_HASH"
+			eval TMP_INFO="$EXT_INFO"
+			eval TMP_LIST="$EXT_LIST"
+			eval TMP_SOFT="$EXT_SOFT"
 
-				eval URL_TEMP="${URL_INFO//NAME/DIR}"
+			eval URL_TEMP="${URL_INFO//NAME/DIR}"
 
-				[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $DIR $PACK, ${DIR}${TMP_SOFT}"
-				[ $DEBUG -gt 0 ] && echo "   DEBUG (URL Info): $URL_TEMP"
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $DIR $PACK, ${DIR}${TMP_SOFT}"
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (URL Info): $URL_TEMP"
 
-				[ "$(ls -1 "${DIR}.${PACK}" | head -1)" = '' ] && continue	# if there are no contents for the iterated package, then no reason to execute the below segment
-				echo "   ${DIR} [${PACK}]"
-				echo -e "\n\n   ----- ${DIR} ${PACK} -----\n\n" >>"$LOG"
+			[ "$(ls -1 "${DIR}.${PACK}" | head -1)" = '' ] && continue	# if there are no contents for the iterated package, then no reason to execute the below segment
+			echo "   ${DIR} [${PACK}]"
+			echo -e "\n\n   ----- ${DIR} ${PACK} -----\n\n" >>"$LOG"
 # UPDATED 2025/10/17 - made this a call to a stored variable so any package manager can create a native package for their distro
 #				mksquashfs "${DIR}.${PACK}" "${DIR}${TMP_SOFT}" >>"$LOG" 2>&1					# create the software package
 #				find "${DIR}.${PACK}" -not -type d | sed "s:^${DIR}.${PACK}/::" >"${DIR}${TMP_LIST}"		# create the manifest list
 #				md5sum "${DIR}${TMP_SOFT}" >"${DIR}${TMP_HASH}"							# create the md5 checksum hash
-				eval $SPM_MAK
-				case "$PACK" in											# create the dependency list
-					'all') [ "$DEP_EXEC_ALL" ] && echo -e "$DEP_EXEC_ALL" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'bin') [ "$DEP_EXEC_BIN" ] && echo -e "$DEP_EXEC_BIN" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'dev') [ "$DEP_EXEC_DEV" ] && echo -e "$DEP_EXEC_DEV" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'doc') [ "$DEP_EXEC_DOC" ] && echo -e "$DEP_EXEC_DOC" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'drv') [ "$DEP_EXEC_DRV" ] && echo -e "$DEP_EXEC_DRV" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'gir') [ "$DEP_EXEC_GIR" ] && echo -e "$DEP_EXEC_GIR" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'lib') [ "$DEP_EXEC_LIB" ] && echo -e "$DEP_EXEC_LIB" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-					'loc') [ "$DEP_EXEC_LOC" ] && echo -e "$DEP_EXEC_LOC" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
-				esac
-				[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
-				[ "$URL_INFO" ] && {
-					echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
-					eval wget "$URL_TEMP" -O "${DIR_REPO}/${DIR}${TMP_INFO}" 2>/dev/null			# download the existing information file
-				}
+			eval $SPM_MAK
+			case "$PACK" in											# create the dependency list
+				'all') [ "$DEP_EXEC_ALL" ] && echo -e "$DEP_EXEC_ALL" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'bin') [ "$DEP_EXEC_BIN" ] && echo -e "$DEP_EXEC_BIN" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'dev') [ "$DEP_EXEC_DEV" ] && echo -e "$DEP_EXEC_DEV" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'doc') [ "$DEP_EXEC_DOC" ] && echo -e "$DEP_EXEC_DOC" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'drv') [ "$DEP_EXEC_DRV" ] && echo -e "$DEP_EXEC_DRV" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'gir') [ "$DEP_EXEC_GIR" ] && echo -e "$DEP_EXEC_GIR" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'lib') [ "$DEP_EXEC_LIB" ] && echo -e "$DEP_EXEC_LIB" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+				'loc') [ "$DEP_EXEC_LOC" ] && echo -e "$DEP_EXEC_LOC" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
+			esac
+			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
+			[ "$URL_INFO" ] && {
+				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
+				eval wget "$URL_TEMP" -O "${DIR_REPO}/${DIR}${TMP_INFO}" 2>/dev/null			# download the existing information file
+			}
 
-				mv "${DIR}${TMP_SOFT}" "${DIR}${TMP_LIST}" "${DIR}${TMP_HASH}" "$DIR_REPO"			# copy the files into the repo
-				echo "   Your package is now available in: ${DIR_REPO}"
-			done
+			mv "${DIR}${TMP_SOFT}" "${DIR}${TMP_LIST}" "${DIR}${TMP_HASH}" "$DIR_REPO"			# copy the files into the repo
+			echo "   Your package is now available in: ${DIR_REPO}"
 		done
-		sudo chown -hR ${USER} * >>"$LOG" 2>&1						# update the ownership of all the package contents to be the current user so we can delete it
-#	fi
+	done
+	sudo chown -hR ${USER} * >>"$LOG" 2>&1						# update the ownership of all the package contents to be the current user so we can delete it
 
 	[ ! "$PASS" ] && [ -x "${DIR_MAKE}/post.package" ] && {					# execute any existing final script (for single-pass; multi-pass is next line)
 		echo -e "\nExecuting the 'post.package' script..." | tee -a "$LOG"
@@ -466,28 +462,19 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo " configurations to tailor the software specifically for your distro."
 	echo
 	echo "  Usage:"
-# UPDATED 2025/10/15 - to match current switches
-#	echo "	${THIS##*/} -n NAME [-a ARCH][-c ...][-d][-D][-p #][-s][-r ...][-t TYPE]"
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo", reverted from -D to -d, move from -S switch to -C action, change to lowercase 'u'
-#	echo "	${THIS##*/} [-ET] -n NAME [-cCdDPsSU][-a ARCH][-p #][-r ...][-t TYPE]"
 # UPDATED 2025/10/17 - made -n the last parameter, switched case to match pax, moved -p to -N
 #	echo "	${THIS##*/} [-CERT] -n NAME [-dPsSu][-a ARCH][-c ...][-p #][-r ...][-t ...]"
 	echo "	${THIS##*/} [-ceirt][-DFPSU][-A ARCH][-C ...][-N #][-R ...][-T ...] NAME"
 	echo
 	echo "  Actions:"
 # UPDATED 2025/10/17 - moved to lowercase to match pax
-## UPDATED 2025/10/16 - move from -S switch to -C action
-#	echo "	-C	only compile the software, no packaging"				# this is so that end users can simply download source code and build locally without having to package anything
 #	echo "	-E	create a package .info file template"
 ## ADDED 2025/10/17
 #	echo "	-I	install the builder profile"
-## ADDED 2025/10/16
-#	echo "	-R	only re-package software instead of building"				# this will be useful if something in DIR_INCL gets updated (e.g. added a .desktop file)
-#	echo "	-T	create a builder profile template"
 	echo "	-c	only compile the software, no packaging"				# this is so that end users can simply download source code and build locally without having to package anything
 	echo "	-e	create a package .info file template"
 	echo "	-i	install the builder profile"						# installs the builder profile in /etc/builder so it can be used
-	echo "	-r	only re-package software instead of building"				# this will be useful if something in DIR_INCL gets updated (e.g. added a .desktop file)
+	echo "	-r	only re-package software instead of building"				# this will be useful if something in DIR_INCL gets updated (e.g. added a .desktop file); this can also sort a single package into multiple (e.g. bin, doc, lib, etc)
 	echo "	-t	create a builder profile template"
 	echo
 	echo "  Switches:"
@@ -495,33 +482,19 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 #	echo "	-a	the CPU architecture to build: ${CPU},all (default)"
 #	# NOTE: this was removed since this needs to be defined per pass
 #	#echo "	-c	the phrase that will uniquely identify the source code directory"	# this is useful when several packages are required to make an extension (e.g. alsa-lib, alsa-utils)
-## UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-##	echo "	-c	obtain the source code from developer"					# this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
-##	echo "	-C	obtain the source code from distro repo"				# this 
-##	echo "	-d	obtain the source code from a local directory"				# this would be considered a local directory (e.g. /mnt/repo)
 #	echo "	-c	obtain source code from: dev(eloper)|dir(ectory)|(distro)repo"					# this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
-## REVERTED 2025/10/16 - moved from -D to -d
-## UPDATED 2025/10/15 - moved from -d to -D
-##	echo "	-D	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
-#	echo "	-d	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
-## UPDATED 2025/10/15 - moved from -D to -C
-##	echo "	-D	download the source code from your online repo"
-## UPDATED 2025/10/15 - moved from -L to -d
-##	echo "	-L	obtain the source code from a local directory"				# this would be considered a local directory (e.g. /mnt/repo)
 ## UPDATED 2025/10/17 - make the last usage parameter the NAME so no switch is needed
 #	echo "	-n	the name of the application to build"					# NOTE: the corresponds to the /etc/builder/NAME directory
 #	echo "	-p	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
 #	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
 #	echo "	-r	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
 #	echo "	-s	skips packaging until final pass"
-## UPDATED 2025/10/15 - moved from -S to -c
-##	echo "	-S	download the source code from offical source"				# this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
-#	echo "	-S	package all contents in a single package - do NOT separate"
 #	echo "	-t	the compile type to use:"
 	echo "	-A	the CPU architecture to build: ${CPU},all (default)"
 # UPDATED 2025/10/20 - use URL_CODE for 'dev' value, add an 'info' value below and use URL_INFO, create a URL_REPO for 'repo' value below
+# VER2 - allow the user to obtain the files from git (implies '-C info'); split the info option as a separate command to get these values from it instead of config file
 	echo "	-C	obtain source code from:"
-	echo "			dev(eloper)|dir(ectory)|(distro)repo|info(file)"		# this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
+	echo "			dev(eloper)|dir(ectory)|(distro)repo|info(file)"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'info' is the .info file in distro repo (URL_INFO in config); this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
 	echo "	-D	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
 # UPDATED 2025/10/17 - mv -s to -F
 	echo "	-F	skips packaging until final pass"
@@ -539,9 +512,6 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "			custom"
 	echo "			default (configure, make, make install)"
 	echo "			scons"
-# REVERTED 2025/10/17
-# UPDATED 2025/10/16 - change to lowercase 'u'
-#	echo "	-u	do not unload compilation packages afterwards"				# this is useful for testing the build profile before it works correctly -OR- just to prevent excessive resource usage when building an entire repo
 	echo "	-U	do not unload compilation packages afterwards"				# this is useful for testing the build profile before it works correctly -OR- just to prevent excessive resource usage when building an entire repo
 	echo
 	echo "	--help		shows this screen"
@@ -554,15 +524,11 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 #	echo "	2. builder -I PROFILE.tgz"
 	echo "	2. builder -i PROFILE.tgz"
 	echo "	3. cd /package/source/code/directory"
-# UPDATED 2025/10/16 - move from -S switch to -C action
-#	echo "	4. builder [-S] -n PROFILE_NAME"
 # UPDATED 2025/10/17 - moved to lowercase to match pax
 #	echo "	4. builder [-C] -n PROFILE_NAME"
 	echo "	4. builder [-c] PROFILE_NAME"
 	echo "	   NOTES:"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
-# UPDATED 2025/10/16 - move from -S switch to -C action
-#	echo "	   - if you ONLY want to compile (end user), pass the -S switch"
 # UPDATED 2025/10/17 - moved to lowercase to match pax
 #	echo "	   - if you ONLY want to compile (end user), pass the -C switch"
 	echo "	   - if you ONLY want to compile (end user), pass the -c switch"
@@ -625,10 +591,6 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 # UPDATED 2025/10/20 - made this more clear)
 #	echo "	- Start this program from within the source code directory"
 #	echo "	  (unless multiple packages are built simultaneously - see NOTES)"
-# UPDATED 2025/10/15 - moved from -D to -C
-#	echo "	- If the '-D' switch was passed the above note can be ignored"
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-#	echo "	- If the '-C' switch was passed the above note can be ignored"
 # UPDATED 2025/10/17 - moved to lowercase to match pax
 #	echo "	- If '-c repo' was passed, the above note can be ignored"
 #	echo "	- The '-s' switch requires a '-p' value"
@@ -639,7 +601,6 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	  directory where the 'configure', 'autogen', etc scripts reside."
 	echo "	- The '-C dir' looks in \"${DIR_REPO}\" for source code."
 # REVERTED 2025/10/17 - moved from -D to -d
-# REVERTED 2025/10/16 - moved from -D to -d
 # UPDATED 2025/10/17 - moved to lowercase to match pax
 #	echo "	- The '-d' switch is useful for making multiple packages from"
 	echo "	- The '-D' switch is useful for making multiple packages from"
@@ -654,18 +615,10 @@ elif [ "$1" = '--version' ]; then
 	head -5 $0 | grep Updated | sed "s/.*\\t//;s/ .*//;s:/:.:g"
 	exit 0
 else
-# UPDATED 2025/10/15 - moved -S to -c, -D to -C
-#	while getopts a:dDeLn:p:Pr:sSt:U OPTION; do		# NOTE: the 'a:' indicates that the '-a' switch requires a value!
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo", reverted from -D to -d, move from -S switch to -C action, change to lowercase 'u'
-#	while getopts a:cCdDEn:p:Pr:sStT:U OPTION; do		# NOTE: the 'a:' indicates that the '-a' switch requires a value!
 # UPDATED 2025/10/17 - switched case to match pax
 #	while getopts a:c:CdEIn:p:Pr:RsStT:u OPTION; do		# NOTE: the 'a:' indicates that the '-a' switch requires a value!
 #		case ${OPTION} in
 #			a) ARCH="$OPTARG" ;;
-## UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-##			c) WGET='public' ;;
-##			C) WGET='private' ;;
-##			d) WGET='local' ;;
 #			c) WGET="$OPTARG" ;;
 #			C) NOPK=TRUE
 ## REMOVED 2025/10/17 - this will just be called using sudo
@@ -675,15 +628,8 @@ else
 ##					exit 1
 ##				fi
 #				;;
-## REVERTED 2025/10/16 - moved from -D to -d
-## UPDATED 2025/10/15 - moved from -d to -D
-##			D) DIRS=TRUE ;;
 #			d) DIRS=TRUE ;;
-## UPDATED 2025/10/15 - moved from -D to -C
-##			D) WGET='private' ;;
 #			E) EXAMPLE=TRUE ;;
-## UPDATED 2025/10/15 - moved from -L to -d
-##			L) WGET='local' ;;
 #			I) INSTALL=TRUE ;;
 ## UPDATED 2025/10/17 - made this the last parameter
 ##			n) NAME="$OPTARG" ;;
@@ -692,15 +638,9 @@ else
 #			r) TRIM="$OPTARG" ;;
 #			R) REPK=TRUE ;;
 #			s) SKIP=TRUE ;;
-## UPDATED 2025/10/15 - moved from -S to -c
-##			S) WGET='public' ;;
-## UPDATED 2025/10/16 - move from -S switch to -C action
-##			S) NOPK=TRUE ;;
 #			S) SPAK=TRUE ;;
 #			t) TYPE="$OPTARG" ;;
 #			T) TEMPLATE=TRUE ;;
-## UPDATED 2025/10/16 - change to lowercase 'u'
-##			U) UNLOAD='' ;;
 #			u) UNLOAD='' ;;
 #			*) exit 1 ;;				# NOTE: since 'getopts' presents it own error, we don't need to do so here
 #		esac
@@ -814,7 +754,7 @@ else
 		echo "toolkit:	gtk	# possible values: shell|lua|ruby|php|python|tcl|tk|... (cli), gtk, fltk  plasma, html, ... (gui)" >>"${DIR_TEMP}/${NAME}.info"
 		echo "toolkitVer:	2.0" >>"${DIR_TEMP}/${NAME}.info"
 		echo "license:	LGPLv2.1" >>"${DIR_TEMP}/${NAME}.info"
-		echo "licenseURI:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
+		echo "document:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
 		echo "maintainer:	example_maintainer_alias" >>"${DIR_TEMP}/${NAME}.info"
 		echo "tags:		space separated project keywords" >>"${DIR_TEMP}/${NAME}.info"
 		echo "overview:	This is a brief overview for the example project" >>"${DIR_TEMP}/${NAME}.info"
@@ -988,22 +928,22 @@ else
 		echo "	EXPORTS=\"export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'" >>config
 		echo "		export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe -fno-exceptions -fno-rtti'" >>config
 		echo "		export LDFLAGS='-Wl,-O1'" >>config
-		echo "		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'\"" >>config
+		echo "		export PKG_CONFIG_PATH='${PATH_PKGCFG}'\"" >>config
 		echo "elif [ \"$ARCH\" = 'i64' ]; then			# exports for Intel/AMD 64bit processors" >>config
 		echo "	EXPORTS=\"export CFLAGS='-mtune=generic -Os -pipe'" >>config
 		echo "		export CXXFLAGS='-mtune=generic -Os -pipe -fno-exceptions -fno-rtti'" >>config
 		echo "		export LDFLAGS='-Wl,-O1'" >>config
-		echo "		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'\"" >>config
+		echo "		export PKG_CONFIG_PATH='${PATH_PKGCFG}'\"" >>config
 		echo "elif [ \"$ARCH\" = 'r32' ]; then			# exports for ARM 32bit processors" >>config
 		echo "	EXPORTS=\"export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'" >>config
 		echo "		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe -fno-exceptions -fno-rtti'" >>config
 		echo "		export LDFLAGS='-Wl,-O1'" >>config
-		echo "		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'\"" >>config
+		echo "		export PKG_CONFIG_PATH='${PATH_PKGCFG}'\"" >>config
 		echo "elif [ \"$ARCH\" = 'r64' ]; then			# exports for ARM 64bit processors" >>config
 		echo "	EXPORTS=\"export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'" >>config
 		echo "		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe -fno-exceptions -fno-rtti'" >>config
 		echo "		export LDFLAGS='-Wl,-O1'" >>config
-		echo "		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'\"" >>config
+		echo "		export PKG_CONFIG_PATH='${PATH_PKGCFG}'\"" >>config
 		echo "fi" >>config
 
 		echo
@@ -1025,23 +965,10 @@ else
 # UPDATED 2025/10/17 - switched case to match pax
 #			TEMP='"$THIS" -n "$NAME" -a "$ARCH" -t "$TYPE"'
 			TEMP='"$THIS" -A "$ARCH" -T "$TYPE"'
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-## UPDATED 2025/10/15 - moved from -D to -C
-##			[ "$WGET" = 'private' ] && TEMP="$TEMP -D"
-#			[ "$WGET" = 'private' ] && TEMP="$TEMP -C"
-## UPDATED 2025/10/15 - moved from -S to -c
-##			[ "$WGET" = 'public' ] && TEMP="$TEMP -S"
-#			[ "$WGET" = 'public' ] && TEMP="$TEMP -c"
-## UPDATED 2025/10/15 - moved from -L to -d
-##			[ "$WGET" = 'local' ] && TEMP="$TEMP -L"
-#			[ "$WGET" = 'local' ] && TEMP="$TEMP -d"
 # UPDATED 2025/10/17 - switched case to match pax
 #			[ "$WGET" != '' ] && TEMP="$TEMP -c $WGET"
 			[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 # REVERTED 2025/10/17 - moved from -d to -D
-# REVERTED 2025/10/16 - moved from -D to -d
-# UPDATED 2025/10/15 - moved from -d to -D
-#			[ "$DIRS" ] && TEMP="$TEMP -d"
 			[ "$DIRS" ] && TEMP="$TEMP -D"
 # UPDATED 2025/10/17 - moved from -p to -N
 #			[ "$PASS" ] && TEMP="$TEMP -p '$PASS'"
@@ -1054,9 +981,6 @@ else
 # UPDATED 2025/10/17 - switched case to match pax
 #			[ "$TRIM" ] && TEMP="$TEMP -r \"$TRIM\""
 			[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
-# REVERTED 2025/10/17
-# UPDATED 2025/10/16 - change to lowercase 'u'
-#			[ ! "$UNLOAD" ] && TEMP="$TEMP -u"
 			[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
 
 # UPDATED 2025/10/17 - NAME is now the last parameter
@@ -1085,41 +1009,20 @@ else
 	[ -e "${DIR_MAKE}/params" ] && . "${DIR_MAKE}/params"	# NOTE: these can completely specify or compliment passed switches (which override these)
 	[ -e "${HOME}/.${DIR_MAKE:1}/params" ] && . "${HOME}/.${DIR_MAKE:1}/params"		# same using a personalized params file
 	OPTIND=1						# reset the global variable used by 'getopts' so it can start over	https://unix.stackexchange.com/questions/233728/bash-function-with-getopts-only-works-the-first-time-its-run
-# UPDATED 2025/10/15 - moved -S to -c, -D to -C
-#	while getopts a:dDLn:p:Pr:sSt:U OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo", reverted from -D to -d, move from -S switch to -C action, change to lowercase 'u'
-#	while getopts a:cCdDn:p:Pr:sSt:U OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
 # UPDATED 2025/10/17 - switched case to match pax
 #	while getopts a:c:Cdn:p:Pr:sSt:u OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
 #		case ${OPTION} in
 #			a) ARCH="$OPTARG" ;;
-## UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-##			c) WGET='public' ;;
-##			C) WGET='private' ;;
-##			d) WGET='local' ;;
 #			c) WGET="$OPTARG" ;;
 #			C) NOPK=TRUE ;;
-## REVERTED 2025/10/16 - moved from -D to -d
-## UPDATED 2025/10/15 - moved from -d to -D
-##			D) DIRS=TRUE ;;
 #			d) DIRS=TRUE ;;
-## UPDATED 2025/10/15 - moved from -D to -C
-##			D) WGET='private' ;;
-## UPDATED 2025/10/15 - moved from -L to -d
-##			L) WGET='local' ;;
 #			n) NAME="$OPTARG" ;;
 #			p) PASS="$OPTARG" ;;
 #			P) PATCH='' ;;
 #			r) TRIM="$OPTARG" ;;
 #			s) SKIP=TRUE ;;
-## UPDATED 2025/10/15 - moved from -S to -c
-##			S) WGET='public' ;;
-## UPDATED 2025/10/16 - move from -S switch to -C action
-##			S) NOPK=TRUE ;;
 #			S) SPAK=TRUE ;;
 #			t) TYPE="$OPTARG" ;;
-## UPDATED 2025/10/16 - change to lowercase 'u'
-##			U) UNLOAD='' ;;
 #			u) UNLOAD='' ;;
 #		esac
 	while getopts A:C:cDFN:PR:ST:U OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
@@ -1151,25 +1054,6 @@ fi
 	echo "ERROR: The '-F' switch requires a valid '-P' value." | tee -a "$LOG"
 	exit 1
 }
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-#[ "$WGET" = 'local' ] && [ ! "$DIR_REPO" ] && {
-## UPDATED 2025/10/15 - moved from -L to -d
-##	echo "ERROR: The '-L' switch requires a DIR_REPO value." | tee -a "$LOG"
-#	echo "ERROR: The '-d' switch requires a DIR_REPO value." | tee -a "$LOG"
-#	exit 1
-#}
-#[ "$WGET" = 'private' ] && [ ! "$URL_CODE" ] && {
-## UPDATED 2025/10/15 - moved from -D to -C
-##	echo "ERROR: The '-D' switch requires a URL_CODE value." | tee -a "$LOG"
-#	echo "ERROR: The '-C' switch requires a URL_CODE value." | tee -a "$LOG"
-#	exit 1
-#}
-#[ "$WGET" = 'public' ] && [ ! "$URL_INFO" ] && {
-## UPDATED 2025/10/15 - moved from -S to -c
-##	echo "ERROR: The '-S' switch requires a URL_INFO value." | tee -a "$LOG"
-#	echo "ERROR: The '-c' switch requires a URL_INFO value." | tee -a "$LOG"
-#	exit 1
-#}
 [ "$WGET" != '' ] && {
 	if [ "$WGET" != 'dev' ] || [ "$WGET" != 'dir' ] || [ "$WGET" != 'repo' ] || [ "$WGET" != 'info' ]; then
 # UPDATED 2025/10/17 - switched case to match pax
@@ -1377,8 +1261,6 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		echo "ERROR: The temp directory could not be entered." >>"$LOG"
 		stop failed
 	}
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-#	[ "$WGET" = 'local' ] && {
 	[ "$WGET" = 'dir' ] && {
 # REMOVED 2025/10/20 - this does NOT appear to be utilized at all as package() sets its own values, not pre-defined ones
 #		PACK='all'
@@ -1401,8 +1283,6 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 			fi
 		fi
 	}
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-#	[ "$WGET" = 'private' ] && {
 # UPDATED 2025/10/20 - this is now using the developer code
 #	[ "$WGET" = 'repo' ] && {
 	[ "$WGET" = 'dev' ] && {
@@ -1426,8 +1306,6 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 			eval wget "$TEMP" 2>>"$LOG" || stop failed
 		fi
 	}
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-#	[ "$WGET" = 'public' ] && {
 # UPDATED 2025/10/20 - this is now using the info file
 #	[ "$WGET" = 'dev' ] && {
 	[ "$WGET" = 'info' ] && {
@@ -1771,23 +1649,10 @@ fi
 # UPDATED 2025/10/17 - switched case to match pax
 #	TEMP='"$THIS" -n "$NAME" -a "$ARCH" -t "$TYPE"'
 	TEMP='"$THIS" -A "$ARCH" -T "$TYPE"'
-# UPDATED 2025/10/16 - combined -c, -C, -d to be -c "dev|dir|repo"
-## UPDATED 2025/10/15 - moved from -D to -C
-##	[ "$WGET" = 'private' ] && TEMP="$TEMP -D"
-#	[ "$WGET" = 'private' ] && TEMP="$TEMP -C"
-## UPDATED 2025/10/15 - moved from -S to -c
-##	[ "$WGET" = 'public' ] && TEMP="$TEMP -S"
-#	[ "$WGET" = 'public' ] && TEMP="$TEMP -c"
-## UPDATED 2025/10/15 - moved from -L to -d
-##	[ "$WGET" = 'local' ] && TEMP="$TEMP -L"
-#	[ "$WGET" = 'local' ] && TEMP="$TEMP -d"
 # UPDATED 2025/10/17 - switched case to match pax
 #	[ "$WGET" != '' ] && TEMP="$TEMP -c $WGET"
 	[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 # REVERTED 2025/10/17 - moved from -d to -D
-# REVERTED 2025/10/16 - moved from -D to -d
-# UPDATED 2025/10/15 - moved from -d to -D
-#	[ "$DIRS" ] && TEMP="$TEMP -d"
 	[ "$DIRS" ] && TEMP="$TEMP -D"
 	#[ "$PASS" ] && TEMP="$TEMP -p '$PASS'"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
 	[ "$PATCH" ] && TEMP="$TEMP -P"
@@ -1797,9 +1662,6 @@ fi
 # UPDATED 2025/10/17 - switched case to match pax
 #	[ "$TRIM" ] && TEMP="$TEMP -r \"$TRIM\""
 	[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
-# REVERTED 2025/10/17
-# UPDATED 2025/10/16 - change to lowercase 'u'
-#	[ ! "$UNLOAD" ] && TEMP="$TEMP -u"
 	[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
 
 	cd "$CWDL"
@@ -1812,4 +1674,12 @@ fi
 
 [ "$NOPK" ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
 [ ! "$NOPK" ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
+
+
+
+# LEFT OFF
+
+#- expand -i to take 'root' (/etc/builder/...) or 'home' (~/.etc/builder/...)
+#- get script to check in XSB and LSB directories
+
 

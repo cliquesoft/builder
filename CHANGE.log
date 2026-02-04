@@ -1,0 +1,30 @@
+2025/10/15
+- Swapped the -S to -c parameter
+- Swapped the -D to -C parameter
+- Swapped the -d to -D parameter
+- Swapped the -L to -d parameter
+- Added the -S (NOPK) parameter to only compile without packaging
+- Updated the --help output to match the new parameters
+
+2025/10/16
+- Reverted the -d to -D option
+- Swapped the -S to -C parameter
+- Swapped the -U to -u parameter
+- Combined the -c, -C, -d to be -c "dev|dir|repo"
+- Added the -S parameter to package into a single file
+- Updated package() to work with -S (moving some code)
+- Added the -R parameter to re-package to split into several files
+- Added the -T parameter to create a profile template
+- Updated the --help output
+
+2025/10/17
+- Adjusted the parameter case to match pax
+- Reverted the -u to -U option
+
+2025/10/20
+- Removed the DIR_CODE variable
+
+
+
+2026/02/04
+- Added the PATH_PKGCFG variable

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+echo "this needs to be updated as it no longer works since the directory structure has been changed"
+exit 0
+
+tar -C package -zchf builder-$(date +%Y.%m.%d).0.tgz .
