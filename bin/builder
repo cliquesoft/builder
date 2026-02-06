@@ -28,10 +28,11 @@
 
 
 
+# DEFAULT VARIABLE DEFINITIONS
+
+export DEBUG=0							# whether or not to show debug output during processing
+
 export DIR_CONF='/etc/builder'					# the location of the configuration for this script	NOTE: this can't be changed in the 'config' file since we have to use this value to find the file itself!
-
-# builder.conf VARIABLE VALUES					  NOTE: each directory containing a variable value needs to be surrouned with single quotes (')
-
 export DIR_DUMP='/tmp/staging'					# the staging location that will be the target to dump compiled programs into for making the various packages
 export DIR_INCL='${DIR_CONF}/${NAME}/include'			# this will store the directory structure and files to include in the package (e.g. usr/local/share/applications/foo.desktop, usr/local/tce.installed/foo, ...)
 export DIR_INST=''						# the directory where the package contents will reside in the running system; blank=root directory
@@ -53,6 +54,7 @@ export DIR_SCRIPTS="${DIR_INST}/etc/init.d"
 export PATH_PKGCFG="/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"  # the default PKG_CONFIG_PATH value
 
 export DEP_MAKE_ALL='compiletc squashfs_tools rsync find_utils'	# compile-time deps list for all projects (e.g. compiletc, mksquashfs-tools, ...)
+export DEP_MAKE_PAK=''						# compile-time deps list for the current project
 
 export EXT_CODE='.${PACK}.all.code'				# [tgz file] package source code
 export EXT_DEPS='.${PACK}.${ARCH}.deps'				# [text file] package dependency list
@@ -74,7 +76,7 @@ export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_INF
 
 export SPM_ALL='sudo pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
 export SPM_PAK='sudo pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
-export SPM_MAK='sudo pax -m NAME ./'				# the software package manager command to make a package from the compiled software by this script
+export SPM_MAK='sudo pax -m $NAME ./'				# the software package manager command to make a package from the compiled software by this script
 export SPM_UNL='sudo pax -u $DEP_MAKE_PAK'			# the software package manager command to unload compile-time dependencies (to keep the environment clean)
 
 export CPU='i32,i64,r32,r64'					# the CPU architectures that you wish to compile for (comma separated)
@@ -103,27 +105,52 @@ elif [ "$2" = 'r64' ]; then
 		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
 fi
 
-export DEBUG=0							# whether or not to show debug output during processing
+
 
 
 # -------------------- DO **NOT** EDIT BELOW THIS LINE --------------------
 
 
-# PROJECT/config VARIABLE VALUES
 
+								# NOTE: This sets defaults on single-pass runs, but also resets the values with multi-pass.
+# [system]								Also some variables below are exported so the 'pre' and 'post' scripts can access them.
+THIS="$0"							# stores this script for multi-pass calls
+CWDL="$(pwd)"							# stores the current working directory location
+export PACK=''							# the type of package being made (e.g. bin, dev, doc, ...)
+SORT=''								# indicates we need to sort the package contents on this pass
+TEMP=''								# stores a temporary value
+
+# [names]
+export NAME=''							# the name of the package being compiled
+
+# [actions]
+EXAMPLE=''							# if we need to generate an example .info file and exit
+INSTALL=''							# indicates we need to install the builder profile
+export NOPK=''							# indicates that NO packaging should take place, only a software compile
+REPK=''								# indicates that we just need to repack the software since something in the 'include' directories changed
+TEMPLATE=''							# creates a blank builder profile template and exit
+
+# [options]
+export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
+DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
+export PASS=''							# the number of passes to make during compile (blank disables)
+PATCH=TRUE							# indicates we need to apply patches to the source code
+SKIP=''								# indicates we need to skip packaging until the final pass
+SPAK=''								# indicates all files need to be placed in a single package
+TRIM=''								# any part of the name to remove when building the package
+TYPE=''								# the type of compile being performed (e.g. autogen, bootstrap, ...)
+WGET=''								# indicates that we need to download the source code file; valid values: local, private, public
+UNLOAD=TRUE							# indicates we need to unload the packages afterwards - regardless of success or failure
+
+# [config]
 CHECK=0								# indicates that the 'make check' step is requested to be made during compile
 CLEAN=0								# indicates that the 'make clean' step is necessary (mostly for multi-run compiles)		NOTE: passing a '2' value performs a distclean
 CONF=1								# indicates that the 'configure' step needs to be made during compile
 PROP=0								# indicates that the 'make mrproper' step is necessary (mostly for multi-run compiles)
 TEST=0								# indicates that the 'make test' step is requested to be made during compile
-# UPDATED 2025/10/20 - reworded to make more sense
-#CODE=''							# the phrase that will uniquely identify the directory containing the source code for the pass (e.g. alsa-lib, alsa-utils); format: TYPE|PHRASE (e.g. lib|alsa-lib, bin|alsa-utils)
 CODE=''								# when compiling multiple softwares with a single builder profile (e.g. alsa-lib, alsa-utils), this value uniquely identifies the package per pass (e.g. config.1 > CODE='alsa-lib'; config.2 > CODE='alsa-utils')
 
 COMPILE=''							# used when TYPE='custom'
-
-# REMOVED 2025/10/20 - this is not being used
-#export DIR_CODE=''						# the location of the source code (this is set further below)
 
 CFG_BIN=""							# DIR_INST/bin	directory locations used with 'configure'
 CFG_DATA=""							# DIR_INST/usr/share
@@ -161,33 +188,19 @@ FLAG_INST=''							# the flags to pass to the 'make install' call
 FLAG_MAKE=''							# the flags to pass to the 'make' call
 
 
-# INTERNAL VARIABLE VALUES					  NOTE: This sets defaults on single-pass runs, but also resets the values with multi-pass.
-								#	Also some variables below are exported so the 'pre' and 'post' scripts can access them.
-THIS="$0"							# stores this script for multi-pass calls
-CWDL="$(pwd)"							# stores the current working directory location
-EXAMPLE=''							# if we need to generate an example .info file and exit
-INSTALL=''							# indicates we need to install the builder profile
-PATCH=TRUE							# indicates we need to apply patches to the source code
-TEMP=''								# stores a temporary value
-TEMPLATE=''							# creates a blank builder profile template and exit
-UNLOAD=TRUE							# indicates we need to unload the packages afterwards - regardless of success or failure
-
-export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
-DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
-export NAME=''							# the name of the package being compiled
-export NOPK=''							# indicates that NO packaging should take place, only a software compile
-export PACK=''							# the type of package being made (e.g. bin, dev, doc, ...)
-export PASS=''							# the number of passes to make during compile (blank disables)
-REPK=''								# indicates that we just need to repack the software since something in the 'include' directories changed
-SKIP=''								# indicates we need to skip packaging until the final pass
-SORT=''								# indicates we need to sort the package contents on this pass
-SPAK=''								# indicates all files need to be placed in a single package
-TRIM=''								# any part of the name to remove when building the package
-TYPE=''								# the type of compile being performed (e.g. autogen, bootstrap, ...)
-WGET=''								# indicates that we need to download the source code file; valid values: local, private, public
 
 
-# INTERNAL FUNCTION DECLARATIONS
+# -------------------------------------------------------------------------
+
+
+
+
+# DEFINE BUILT-IN FUNCTIONS FOR EXPORT
+
+
+
+
+# DEFINE BUILT-IN FUNCTIONS FOR INTERNAL USE
 
 # Syntax: stop TYPE [EXIT]
 # Exits gracefully by cleaning up the desired parts of the file system after a failed build
@@ -282,8 +295,6 @@ package() {
 		echo -e "\nSeparating into various packages..." | tee -a "$LOG"
 		for DIR in $NAMES; do
 			# strip the debug symbols from the just-compiled software		  https://superuser.com/questions/236601/how-do-i-execute-multiple-commands-when-using-find
-# UPDATED 2017/08/30 - to remove erroneous errors in the logs
-#			find . \( -not -type d -a -not -name \*.la -a -not -name \*.a \) -executable -exec /bin/sh -c 'file -b --mime-type {} | grep -q application && strip --strip-unneeded {}' \;
 			find . -type f -executable \( -not -name \*.la -a -not -name \*.a \) -exec /bin/sh -c 'file -b --mime-type {} | grep -q application && strip --strip-unneeded {}' \;
 
 			# create all the directories to split the package contents into
@@ -327,8 +338,6 @@ package() {
 	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then							# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
 		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"	# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when TYPE=custom (e.g. FXwm)
 		for DIR in $NAMES; do
-# UPDATED 2025/10/17 - both 'if' statement can utilize this code block now
-#				for PACK in bin dev doc drv gir lib loc; do
 			for PACK in $TEMP; do
 				[ ! -d "${DIR_DUMP}/${DIR}.${PACK}" ] && continue	# if a directory is missing then there's no reason to process something that doesn't exist!
 
@@ -343,7 +352,6 @@ package() {
 				find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null			# update the permissions of all the libraries
 				find ".${DIR_INST}/lib64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
 				find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null					# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
-#				chmod -R $PRM_DIRS bin sbin usr/bin usr/sbin usr/local/bin usr/local/sbin 2>/dev/null					# update these directory contents to be executable
 				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null				# update these directory contents to be executable
 				sudo chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>"$LOG" 2>&1								# update the ownership of all the package contents
 			done
@@ -389,8 +397,6 @@ package() {
 												# NOTE: list all contents | non-greedy sed to remove extension (e.g. .bin) | sort to remove duplicates
 	echo -e "\nCreating the various packages..." | tee -a "$LOG"
 	for DIR in $NAMES; do								# NOTE: the DIR variable will contain directory names, or the actual names of the packages - depending on configuration
-# UPDATED 2025/10/17 - both 'if' statement can utilize this code block now
-#			for PACK in bin dev doc drv gir lib loc; do
 		for PACK in $TEMP; do
 			[ ! -d "${DIR}.${PACK}" ] && continue				# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
 
@@ -408,11 +414,7 @@ package() {
 			[ "$(ls -1 "${DIR}.${PACK}" | head -1)" = '' ] && continue	# if there are no contents for the iterated package, then no reason to execute the below segment
 			echo "   ${DIR} [${PACK}]"
 			echo -e "\n\n   ----- ${DIR} ${PACK} -----\n\n" >>"$LOG"
-# UPDATED 2025/10/17 - made this a call to a stored variable so any package manager can create a native package for their distro
-#				mksquashfs "${DIR}.${PACK}" "${DIR}${TMP_SOFT}" >>"$LOG" 2>&1					# create the software package
-#				find "${DIR}.${PACK}" -not -type d | sed "s:^${DIR}.${PACK}/::" >"${DIR}${TMP_LIST}"		# create the manifest list
-#				md5sum "${DIR}${TMP_SOFT}" >"${DIR}${TMP_HASH}"							# create the md5 checksum hash
-			eval $SPM_MAK
+			eval $SPM_MAK							# NOTE: we use a variable so any package manager can create a native package for their distro
 			case "$PACK" in											# create the dependency list
 				'all') [ "$DEP_EXEC_ALL" ] && echo -e "$DEP_EXEC_ALL" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
 				'bin') [ "$DEP_EXEC_BIN" ] && echo -e "$DEP_EXEC_BIN" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
@@ -435,7 +437,7 @@ package() {
 	done
 	sudo chown -hR ${USER} * >>"$LOG" 2>&1						# update the ownership of all the package contents to be the current user so we can delete it
 
-	[ ! "$PASS" ] && [ -x "${DIR_MAKE}/post.package" ] && {					# execute any existing final script (for single-pass; multi-pass is next line)
+	[ ! "$PASS" ] && [ -x "${DIR_MAKE}/post.package" ] && {				# execute any existing final script (for single-pass; multi-pass is next line)
 		echo -e "\nExecuting the 'post.package' script..." | tee -a "$LOG"
 		"${DIR_MAKE}/post.package" 2>>"$LOG" || stop failed
 	}
@@ -454,6 +456,16 @@ package() {
 
 
 
+# LOAD VARIABLE PERSONALIZATION
+
+[ -e "${DIR_CONF}/config" ] && . "${DIR_CONF}/config"												# System-wide config, overwriting any default variable values set at the top
+[ -e "/usr/local/${DIR_CONF}/config" ] && . "/usr/local/${DIR_CONF}/config"									# ditto as alternate location
+[ -e "${HOME}/.$(echo "${DIR_CONF}" | tail -c +2)/config" ] && . "${HOME}/.$(echo "${DIR_CONF}" | tail -c +2)/config"				# ditto as personalized config file - using XSB
+[ -e "${HOME}/.${DIR_CONF##*/}/config" ] && . "${HOME}/.${DIR_CONF##*/}/config"									# ditto as personalized config file - using LSB
+
+
+
+
 # PROCESS THE PASSED SWITCHES
 
 if [ "$1" = '' ] || [ "$1" = '--help' ]; then
@@ -462,15 +474,9 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo " configurations to tailor the software specifically for your distro."
 	echo
 	echo "  Usage:"
-# UPDATED 2025/10/17 - made -n the last parameter, switched case to match pax, moved -p to -N
-#	echo "	${THIS##*/} [-CERT] -n NAME [-dPsSu][-a ARCH][-c ...][-p #][-r ...][-t ...]"
 	echo "	${THIS##*/} [-ceirt][-DFPSU][-A ARCH][-C ...][-N #][-R ...][-T ...] NAME"
 	echo
 	echo "  Actions:"
-# UPDATED 2025/10/17 - moved to lowercase to match pax
-#	echo "	-E	create a package .info file template"
-## ADDED 2025/10/17
-#	echo "	-I	install the builder profile"
 	echo "	-c	only compile the software, no packaging"				# this is so that end users can simply download source code and build locally without having to package anything
 	echo "	-e	create a package .info file template"
 	echo "	-i	install the builder profile"						# installs the builder profile in /etc/builder so it can be used
@@ -478,28 +484,12 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	-t	create a builder profile template"
 	echo
 	echo "  Switches:"
-# UPDATED 2025/10/17 - moved to uppercase to match pax
-#	echo "	-a	the CPU architecture to build: ${CPU},all (default)"
-#	# NOTE: this was removed since this needs to be defined per pass
-#	#echo "	-c	the phrase that will uniquely identify the source code directory"	# this is useful when several packages are required to make an extension (e.g. alsa-lib, alsa-utils)
-#	echo "	-c	obtain source code from: dev(eloper)|dir(ectory)|(distro)repo"					# this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
-## UPDATED 2025/10/17 - make the last usage parameter the NAME so no switch is needed
-#	echo "	-n	the name of the application to build"					# NOTE: the corresponds to the /etc/builder/NAME directory
-#	echo "	-p	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
-#	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
-#	echo "	-r	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
-#	echo "	-s	skips packaging until final pass"
-#	echo "	-t	the compile type to use:"
 	echo "	-A	the CPU architecture to build: ${CPU},all (default)"
-# UPDATED 2025/10/20 - use URL_CODE for 'dev' value, add an 'info' value below and use URL_INFO, create a URL_REPO for 'repo' value below
 # VER2 - allow the user to obtain the files from git (implies '-C info'); split the info option as a separate command to get these values from it instead of config file
 	echo "	-C	obtain source code from:"
-	echo "			dev(eloper)|dir(ectory)|(distro)repo|info(file)"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'info' is the .info file in distro repo (URL_INFO in config); this is based on the 'URL' and 'filename' values in the .info file	WARN: this requires an existing .info file with certain values!
+	echo "			dev(eloper)|dir(ectory)|(distro)repo|info(file)"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'info' is the .info file in distro repo (URL_INFO in config); this is based on the 'download' and 'package' values in the .info file	WARN: this requires an existing .info file with certain values!
 	echo "	-D	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
-# UPDATED 2025/10/17 - mv -s to -F
 	echo "	-F	skips packaging until final pass"
-# UPDATED 2025/10/17 - mv -p to -N
-#	echo "	-p	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
 	echo "	-N	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
 	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
 	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
@@ -520,27 +510,17 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo
 	echo "  Build Software Steps:                             [end user/package creator]"
 	echo "	1. download the builder profile"
-# UPDATED 2025/10/17 - moved to lowercase to match pax
-#	echo "	2. builder -I PROFILE.tgz"
 	echo "	2. builder -i PROFILE.tgz"
 	echo "	3. cd /package/source/code/directory"
-# UPDATED 2025/10/17 - moved to lowercase to match pax
-#	echo "	4. builder [-C] -n PROFILE_NAME"
 	echo "	4. builder [-c] PROFILE_NAME"
 	echo "	   NOTES:"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
-# UPDATED 2025/10/17 - moved to lowercase to match pax
-#	echo "	   - if you ONLY want to compile (end user), pass the -C switch"
 	echo "	   - if you ONLY want to compile (end user), pass the -c switch"
 	echo
 	echo "  Profile Creation Steps:                          [developer/package creator]"
 	echo "	1. Fill out 'config' in ${DIR_CONF} (or ~/.$(echo "${DIR_CONF}" | sed 's/^.//'))"
-# UPDATED 2025/10/17 - switched case to match pax, moved NAME to last parameter
-#	echo "	1. builder -E -n NAME"
 	echo "	1. builder -e NAME"
 	echo "	2. Fill out ${DIR_TEMP}/NAME.info"
-# UPDATED 2025/10/17 - moved to lowercase to match pax, moved NAME to last parameter
-#	echo "	3. builder -T -n NAME"
 	echo "	3. builder -t NAME"
 	echo "	4. Fill out ${DIR_TEMP}/NAME/config"
 	echo "	5. Optionally fill out ${DIR_TEMP}/NAME/params, or delete the file"
@@ -588,25 +568,12 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	      (also apply to the 'include' directory - include.1/DIR_ETC)"
 	echo
 	echo "  Notes:"
-# UPDATED 2025/10/20 - made this more clear)
-#	echo "	- Start this program from within the source code directory"
-#	echo "	  (unless multiple packages are built simultaneously - see NOTES)"
-# UPDATED 2025/10/17 - moved to lowercase to match pax
-#	echo "	- If '-c repo' was passed, the above note can be ignored"
-#	echo "	- The '-s' switch requires a '-p' value"
-# UPDATED 2025/10/20 - made this more clear)
-#	echo "	- If '-C repo' was passed, the above note can be ignored"
 	echo "	- Unless the '-C' switch was passed, with an accompanying config file"
 	echo "	  CODE value, you must start this program from within the source code"
 	echo "	  directory where the 'configure', 'autogen', etc scripts reside."
 	echo "	- The '-C dir' looks in \"${DIR_REPO}\" for source code."
-# REVERTED 2025/10/17 - moved from -D to -d
-# UPDATED 2025/10/17 - moved to lowercase to match pax
-#	echo "	- The '-d' switch is useful for making multiple packages from"
 	echo "	- The '-D' switch is useful for making multiple packages from"
 	echo "	  a single compile (e.g. php, php-cli, php-fpm, ...)"
-# REMOVED 2025/10/20 - this is already specified when the command is run without the accompanying switch
-#	echo "	- The '-F' switch requires a '-P' value"
 	echo "	- It is possible to compile multiple softwares with a single"
 	echo "	  builder profile (e.g. alsa-libs, alsa-utils) - see NOTES"
 	echo
@@ -615,35 +582,6 @@ elif [ "$1" = '--version' ]; then
 	head -5 $0 | grep Updated | sed "s/.*\\t//;s/ .*//;s:/:.:g"
 	exit 0
 else
-# UPDATED 2025/10/17 - switched case to match pax
-#	while getopts a:c:CdEIn:p:Pr:RsStT:u OPTION; do		# NOTE: the 'a:' indicates that the '-a' switch requires a value!
-#		case ${OPTION} in
-#			a) ARCH="$OPTARG" ;;
-#			c) WGET="$OPTARG" ;;
-#			C) NOPK=TRUE
-## REMOVED 2025/10/17 - this will just be called using sudo
-##				if [ $(id -u) -gt 0 ]; then	# make sure this has a setuid of root so the installation will be fine
-##					echo "ERROR: to install the compiled files, advanced priviledges will be required."
-##					echo "       Try executing with 'sudo' or the root account."
-##					exit 1
-##				fi
-#				;;
-#			d) DIRS=TRUE ;;
-#			E) EXAMPLE=TRUE ;;
-#			I) INSTALL=TRUE ;;
-## UPDATED 2025/10/17 - made this the last parameter
-##			n) NAME="$OPTARG" ;;
-#			p) PASS="$OPTARG" ;;
-#			P) PATCH='' ;;
-#			r) TRIM="$OPTARG" ;;
-#			R) REPK=TRUE ;;
-#			s) SKIP=TRUE ;;
-#			S) SPAK=TRUE ;;
-#			t) TYPE="$OPTARG" ;;
-#			T) TEMPLATE=TRUE ;;
-#			u) UNLOAD='' ;;
-#			*) exit 1 ;;				# NOTE: since 'getopts' presents it own error, we don't need to do so here
-#		esac
 	while getopts A:cC:DeFin:N:PrR:StT:U OPTION; do		# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		case ${OPTION} in
 			A) ARCH="$OPTARG" ;;
@@ -737,34 +675,38 @@ else
 
 	if [ "$EXAMPLE" ]; then
 		echo -e "\nCreating a package .info file template..." | tee -a "$LOG"
-
 		echo "name:		${NAME}" >"${DIR_TEMP}/${NAME}.info"
-		echo "title:		Example short description" >>"${DIR_TEMP}/${NAME}.info"
-		echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
-		echo "git:		abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"
+		echo "title:		Concise title" >>"${DIR_TEMP}/${NAME}.info"
+		echo "description:	Short description" >>"${DIR_TEMP}/${NAME}.info"
+		echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"
+		echo "homepage:	https://www.company.com/" >>"${DIR_TEMP}/${NAME}.info"
 		echo "packaged:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
 		echo "released:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
-		echo "authors:	Example Name" >>"${DIR_TEMP}/${NAME}.info"
-		echo "homepage:	https://www.project.com/any/sub/dirs/" >>"${DIR_TEMP}/${NAME}.info"
-		echo "download:	ftp://ftp.project.com/any/sub/dirs/" >>"${DIR_TEMP}/${NAME}.info"
-		echo "filename:	example-1.2.3.tgz" >>"${DIR_TEMP}/${NAME}.info"
+		echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
+		echo "git:		https://distributor.com/path/to/project/" >>"${DIR_TEMP}/${NAME}.info"
+		echo "commit:		abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"
+		echo "download:	http://domain.com/path/to/project/" >>"${DIR_TEMP}/${NAME}.info"
+		echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"
+		echo "source:		example-1.2.3.code" >>"${DIR_TEMP}/${NAME}.info"
+		echo "builder:	example-1.2.3.bldr" >>"${DIR_TEMP}/${NAME}.info"
+		echo "compile:	example-1.2.3.make" >>"${DIR_TEMP}/${NAME}.info"
+		echo "size:		100K" >>"${DIR_TEMP}/${NAME}.info"
 		echo "category:	system" >>"${DIR_TEMP}/${NAME}.info"
-		echo "rating:		g" >>"${DIR_TEMP}/${NAME}.info"
 		echo "interface:	gui	# valid values: cli,gui" >>"${DIR_TEMP}/${NAME}.info"
-		echo "toolkit:	gtk	# possible values: shell|lua|ruby|php|python|tcl|tk|... (cli), gtk, fltk  plasma, html, ... (gui)" >>"${DIR_TEMP}/${NAME}.info"
-		echo "toolkitVer:	2.0" >>"${DIR_TEMP}/${NAME}.info"
+		echo "toolkit:	gtk2	# possible values: shell|lua|ruby|php|python|tcl|tk|... (cli), gtk, fltk  plasma, html, ... (gui)" >>"${DIR_TEMP}/${NAME}.info"
+		echo "rating:		g" >>"${DIR_TEMP}/${NAME}.info"
 		echo "license:	LGPLv2.1" >>"${DIR_TEMP}/${NAME}.info"
 		echo "document:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
 		echo "maintainer:	example_maintainer_alias" >>"${DIR_TEMP}/${NAME}.info"
 		echo "tags:		space separated project keywords" >>"${DIR_TEMP}/${NAME}.info"
-		echo "overview:	This is a brief overview for the example project" >>"${DIR_TEMP}/${NAME}.info"
-		echo "comments:	" >>"${DIR_TEMP}/${NAME}.info"
-		echo "changes:	" >>"${DIR_TEMP}/${NAME}.info"
+		echo "overview:	This is a detailed overview for the example project" >>"${DIR_TEMP}/${NAME}.info"
+		echo "comments:	Any applicable comments for the package" >>"${DIR_TEMP}/${NAME}.info"
+		echo "changes:	Brief list of changes between package releases" >>"${DIR_TEMP}/${NAME}.info"
 
-		echo
-		echo "The sample .info file has been successfully created! It can be found at:"
-		echo "  ${DIR_TEMP}/${NAME}.info"
-		echo
+		echo | tee -a "$LOG"
+		echo "The sample .info file has been successfully created! It can be found at:" | tee -a "$LOG"
+		echo "  ${DIR_TEMP}/${NAME}.info" | tee -a "$LOG"
+		echo | tee -a "$LOG"
 		exit 0
 	fi
 
@@ -801,31 +743,31 @@ else
 		echo "DIR_BIN		LSB: /bin" >>"README.txt"
 		echo "DIR_ETC		LSB: /etc" >>"README.txt"
 		echo "DIR_LIB		LSB: /lib" >>"README.txt"
-		echo "DIR_SBIN		LSB: /sbin		XiniX: /bin" >>"README.txt"
-		echo "DIR_SHARE		LSB: /usr/share		XiniX: /var/share" >>"README.txt"
+		echo "DIR_SBIN		LSB: /sbin		XSB: /bin" >>"README.txt"
+		echo "DIR_SHARE		LSB: /usr/share		XSB: /var/share" >>"README.txt"
 		echo "DIR_VAR		LSB: /var" >>"README.txt"
-		echo "DIR_MARKERS	LSB: -			XiniX: /var/cache/Software/scripts" >>"README.txt"
-		echo "DIR_SCRIPTS	LSB: /etc/init.d	XiniX: /var/cache/Software/services" >>"README.txt"
+		echo "DIR_MARKERS	LSB: -			XSB: /var/cache/software" >>"README.txt"
+		echo "DIR_SCRIPTS	LSB: /etc/init.d" >>"README.txt"
 		echo >>"README.txt"
 		echo "Compile 'configure' Directory Locations:" >>"README.txt"
 		echo "CFG_BIN		LSB: DIR_INST/bin" >>"README.txt"
-		echo "CFG_DATA		LSB: DIR_INST/share	XiniX: DIR_INST/var/share" >>"README.txt"
+		echo "CFG_DATA		LSB: DIR_INST/share	XSB: DIR_INST/var/share" >>"README.txt"
 		echo "CFG_DATAROOT	LSB: CFG_DATA" >>"README.txt"
 		echo "CFG_DOC		LSB: CFG_DATA/doc/NAME" >>"README.txt"
 		echo "CFG_DVI		LSB: CFG_DOC" >>"README.txt"
 		echo "CFG_HTML		LSB: CFG_DOC" >>"README.txt"
-		echo "CFG_INCLUDE	LSB: DIR_INST/include	XiniX: DIR_INST/var/lib/include" >>"README.txt"
+		echo "CFG_INCLUDE	LSB: DIR_INST/include	XSB: DIR_INST/lib/include" >>"README.txt"
 		echo "CFG_INFO		LSB: CFG_DATA/info" >>"README.txt"
 		echo "CFG_LIB		LSB: DIR_INST/lib" >>"README.txt"
-		echo "CFG_LIBEXEC	LSB: DIR_INST/libexec	XiniX: CFG_LIB" >>"README.txt"
+		echo "CFG_LIBEXEC	LSB: DIR_INST/libexec	XSB: CFG_LIB" >>"README.txt"
 		echo "CFG_LOCALE	LSB: CFG_DATA/locale" >>"README.txt"
 		echo "CFG_LOCALSTATE	LSB: DIR_INST/var" >>"README.txt"
 		echo "CFG_MAN		LSB: CFG_DATA/man" >>"README.txt"
-		echo "CFG_OLDINCLUDE	LSB: /usr/include	XiniX: DIR_INST/var/lib/include" >>"README.txt"
+		echo "CFG_OLDINCLUDE	LSB: /usr/local/include	XSB: DIR_INST/lib/include" >>"README.txt"
 		echo "CFG_PDF		LSB: CFG_DOC" >>"README.txt"
 		echo "CFG_PS		LSB: CFG_DOC" >>"README.txt"
-		echo "CFG_SBIN		LSB: DIR_INST/sbin	XiniX: DIR_INST/bin" >>"README.txt"
-		echo "CFG_SHAREDSTATE	LSB: DIR_INST/com	XiniX: DIR_INST/var" >>"README.txt"
+		echo "CFG_SBIN		LSB: DIR_INST/sbin	XSB: DIR_INST/bin" >>"README.txt"
+		echo "CFG_SHAREDSTATE	LSB: DIR_INST/com	XSB: DIR_INST/var" >>"README.txt"
 		echo "CFG_SYSCONFIG	LSB: DIR_INST/etc" >>"README.txt"
 		echo "CFG_MISC		" >>"README.txt"
 		echo >>"README.txt"
@@ -854,10 +796,6 @@ else
 		echo "#     - this is optional but does allow a '-C dev' call" >>config
 		echo "URL_CODE=''" >>config
 		echo >>config
-# UPDATED 2025/10/20 - the first value was removed as it was not being utilized
-#		echo "# The below variable is optional and contains two values separated by a pipe" >>config
-#		echo "# The first value specifies the package type: all,bin,dev,doc,drv,gir,lib,loc" >>config
-#		echo "# The second specifies a unique name " >>config
 		echo "# The below variable is optional and should only be used when compiling more" >>config
 		echo "# than one software with a single builder profile. For example you can compile" >>config
 		echo "# both alsa-libs and alsa-utils with a single 'builder alsa' command if the" >>config
@@ -962,29 +900,16 @@ else
 	if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then		# if the default (which is all) or a specified 'all' was passed, then...
 		# cycle each defined CPU architecture and compile
 		for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do	# call this script again for all supported CPU architecture and exit
-# UPDATED 2025/10/17 - switched case to match pax
-#			TEMP='"$THIS" -n "$NAME" -a "$ARCH" -t "$TYPE"'
 			TEMP='"$THIS" -A "$ARCH" -T "$TYPE"'
-# UPDATED 2025/10/17 - switched case to match pax
-#			[ "$WGET" != '' ] && TEMP="$TEMP -c $WGET"
 			[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
-# REVERTED 2025/10/17 - moved from -d to -D
 			[ "$DIRS" ] && TEMP="$TEMP -D"
-# UPDATED 2025/10/17 - moved from -p to -N
-#			[ "$PASS" ] && TEMP="$TEMP -p '$PASS'"
 			[ "$PASS" ] && TEMP="$TEMP -N '$PASS'"
 			[ "$PATCH" ] && TEMP="$TEMP -P"
-# UPDATED 2025/10/17 - moved -s to -F
-#			[ "$SKIP" ] && TEMP="$TEMP -s"
 			[ "$SKIP" ] && TEMP="$TEMP -F"
 			[ "$SPAK" ] && TEMP="$TEMP -S"
-# UPDATED 2025/10/17 - switched case to match pax
-#			[ "$TRIM" ] && TEMP="$TEMP -r \"$TRIM\""
 			[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
 			[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
 
-# UPDATED 2025/10/17 - NAME is now the last parameter
-#			eval $TEMP
 			eval $TEMP "$NAME"
 		done
 		exit 0
@@ -1006,32 +931,18 @@ else
 	eval URL_INFO="$URL_INFO"
 
 	# if a parameters file is present, read in its values
-	[ -e "${DIR_MAKE}/params" ] && . "${DIR_MAKE}/params"	# NOTE: these can completely specify or compliment passed switches (which override these)
-	[ -e "${HOME}/.${DIR_MAKE:1}/params" ] && . "${HOME}/.${DIR_MAKE:1}/params"		# same using a personalized params file
+	[ -e "${DIR_MAKE}/params" ] && . "${DIR_MAKE}/params"										# Global package parameters	NOTE: these can completely specify or compliment passed switches (which override these)
+	[ -e "/usr/local/${DIR_MAKE}/params" ] && . "/usr/local/${DIR_MAKE}/params"							# ditto as alternate location
+	[ -e "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/params" ] && . "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/params"		# ditto as personalized config file - using XSB
+	[ -e "${HOME}/.${DIR_MAKE##*/}/params" ] && . "${HOME}/.${DIR_MAKE##*/}/params"							# ditto as personalized config file - using LSB
+
 	OPTIND=1						# reset the global variable used by 'getopts' so it can start over	https://unix.stackexchange.com/questions/233728/bash-function-with-getopts-only-works-the-first-time-its-run
-# UPDATED 2025/10/17 - switched case to match pax
-#	while getopts a:c:Cdn:p:Pr:sSt:u OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
-#		case ${OPTION} in
-#			a) ARCH="$OPTARG" ;;
-#			c) WGET="$OPTARG" ;;
-#			C) NOPK=TRUE ;;
-#			d) DIRS=TRUE ;;
-#			n) NAME="$OPTARG" ;;
-#			p) PASS="$OPTARG" ;;
-#			P) PATCH='' ;;
-#			r) TRIM="$OPTARG" ;;
-#			s) SKIP=TRUE ;;
-#			S) SPAK=TRUE ;;
-#			t) TYPE="$OPTARG" ;;
-#			u) UNLOAD='' ;;
-#		esac
 	while getopts A:C:cDFN:PR:ST:U OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
 		case ${OPTION} in
 			A) ARCH="$OPTARG" ;;
 			C) WGET="$OPTARG" ;;
 			c) NOPK=TRUE ;;
 			D) DIRS=TRUE ;;
-# UPDATED 2025/10/17 - moved -s to -F
 			F) SKIP=TRUE ;;
 			N) PASS="$OPTARG" ;;
 			P) PATCH='' ;;
@@ -1049,43 +960,25 @@ fi
 # PERFORM PASSED SWITCHES CHECKS
 
 [ "$SKIP" ] && [ ! "$PASS" ] && {
-# UPDATED 2025/10/17 - switched case to match pax
-#	echo "ERROR: The '-s' switch requires a valid '-p' value." | tee -a "$LOG"
 	echo "ERROR: The '-F' switch requires a valid '-P' value." | tee -a "$LOG"
 	exit 1
 }
 [ "$WGET" != '' ] && {
 	if [ "$WGET" != 'dev' ] || [ "$WGET" != 'dir' ] || [ "$WGET" != 'repo' ] || [ "$WGET" != 'info' ]; then
-# UPDATED 2025/10/17 - switched case to match pax
-#		echo "ERROR: an invalid value for '-c' was passed."
 		echo "ERROR: an invalid value for '-C' was passed."
 		exit 1
 	fi
 
 	TEMP=''
-# UPDATED 2025/10/20 - these are now different
-#	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_INFO" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_CODE" ] ) ) && {
 	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) || ( [ "$WGET" = 'info' ] && [ ! "$URL_INFO" ] ) ) && {
-#		[ "$WGET" = 'dev' ] && TEMP='URL_INFO'
 		[ "$WGET" = 'dev' ] && TEMP='URL_CODE'
 		[ "$WGET" = 'dir' ] && TEMP='DIR_REPO'
-#		[ "$WGET" = 'repo' ] && TEMP='URL_CODE'
 		[ "$WGET" = 'repo' ] && TEMP='URL_REPO'
 		[ "$WGET" = 'info' ] && TEMP='URL_INFO'
-# UPDATED 2025/10/17 - switched case to match pax
-#		echo "ERROR: The '-c $WGET' switch requires a $TEMP value." | tee -a "$LOG"
 		echo "ERROR: The '-C $WGET' switch requires a $TEMP value." | tee -a "$LOG"
 		exit
 	}
 }
-
-
-
-
-# LOAD VARIABLE PERSONALIZATION
-
-[ -e "${DIR_CONF}/config" ] && . "${DIR_CONF}/config"						# overwrite any of the variables set above by reading in a global .conf file
-[ -e "${HOME}/.${DIR_CONF:1}/config" ] && . "${HOME}/.${DIR_CONF:1}/config"			# same using a personalized .conf file
 
 
 
@@ -1112,11 +1005,6 @@ fi
 	[ $PASS -gt $TEMP ] && stop proper			#   if we have just completed the last requred pass, then cleanup and exit
 	echo "${TEMP}|${PASS}" >"${DIR_TEMP}/${NAME}.pass"	#   if we've made it here, we still have at least one pass to perform, so update the values!
 }
-# NOTE: this was moved to the bottom of the next section since this will error out if no DIR_TEMP has been created yet
-#[ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] && {	# if we need to perform multi-passes and none are recorded yet, then...
-#	echo "${PASS}|1" >"${DIR_TEMP}/${NAME}.pass"		#   stored value in format of: TOTAL|CURRENT
-#	PASS=1							#   now store the value that we are working on the first pass
-#}
 
 ( [ "$SUDO" = 'TRUE' ] || [ "$SUDO" = '1' ] ) && SUDO='sudo'	# update the value to be the binary name so we can use it like "$SUDO mv ..."	NOTE: to use 'sudo' with parameters, simply add them for the SUDO value in the builder.conf file (e.g. SUDO='sudo -x -y -z')
 
@@ -1262,9 +1150,6 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		stop failed
 	}
 	[ "$WGET" = 'dir' ] && {
-# REMOVED 2025/10/20 - this does NOT appear to be utilized at all as package() sets its own values, not pre-defined ones
-#		PACK='all'
-#		[ "$CODE" ] && PACK="$(echo "${CODE%|*}")"					# if CODE has a value, then we need to set PACK as its preceeding value
 		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
 		if [ ! -e "$(eval echo ${TEMP}${EXT_CODE})" ]; then				# if the source code is not already copied (e.g. by utilizing the same source code such as php, not like alsa-lib and alsa-config), then...
@@ -1283,12 +1168,7 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 			fi
 		fi
 	}
-# UPDATED 2025/10/20 - this is now using the developer code
-#	[ "$WGET" = 'repo' ] && {
 	[ "$WGET" = 'dev' ] && {
-# REMOVED 2025/10/20 - this does NOT appear to be utilized at all as package() sets its own values, not pre-defined ones
-#		PACK='all'
-#		[ "$CODE" ] && PACK="$(echo "${CODE%|*}")"					# if CODE has a value, then we need to set PACK as its preceeding value
 		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
 		if [ ! -e "$(eval echo ${TEMP}${EXT_CODE})" ]; then
@@ -1306,26 +1186,23 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 			eval wget "$TEMP" 2>>"$LOG" || stop failed
 		fi
 	}
-# UPDATED 2025/10/20 - this is now using the info file
-#	[ "$WGET" = 'dev' ] && {
 	[ "$WGET" = 'info' ] && {
 		OARCH="$ARCH"									# temporarily store the old value
 		ARCH='all'
-# REMOVED 2025/10/20 - this does NOT appear to be utilized at all as package() sets its own values, not pre-defined ones
-#		PACK='all'
-#		[ "$CODE" ] && PACK="$(echo "${CODE%|*}")"					# if CODE has a value, then we need to set PACK as its preceeding value
-		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
+		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply package name trimming beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
 		TEMP="$(echo "$URL_INFO" | sed "s/$NAME/$TEMP/g")"				# make name substitution in the URL (e.g. liba52 > a52)
-		if [ -e "$(eval echo ${TEMP##*/})" ]; then					# if the .info file is already downloaded (to prevent an erroneous error below), then...
+		if [ -e "$(eval echo ${TEMP##*/})" ]; then					# if the .info file is already downloaded (to prevent an error below), then...
 			TEMP="$(eval echo ${TEMP##*/})"						#   store that filename
 		else										# otherwise
 			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
 			eval wget "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
-			TEMP="$(ls -1t | head -1)"						#   store the filename that was just downloaded
+# UPDATED 2026/02/05
+#			TEMP="$(ls -1t | head -1)"						#   store the filename that was just downloaded
+			TEMP="${URL_INFO##*/}"							#   store the filename that was just downloaded
 		fi
-		if [ ! -e "$(grep -e ^'filename:' "${TEMP}" | sed 's/.*:\t//')" ]; then
-			TEMP="$(grep -e ^'download:' -e ^'filename:' "${TEMP}" | sed 's/.*:\t//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
+		if [ ! -e "$(grep -e ^'package:' "${TEMP}" | sed 's/.*:\t//')" ]; then
+			TEMP="$(grep -e ^'download:' -e ^'package:' "${TEMP}" | sed 's/.*:\t//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
 			echo "Calling: wget \"$TEMP\"" >>"$LOG"
 			wget "$TEMP" 2>>"$LOG" || stop failed
 		fi
@@ -1354,12 +1231,8 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 elif [ "$CODE" ]; then										# if we have a CODE value, then we need to change into that directory before we continue!
 	echo -e "\nEntering source code directory..." | tee -a "$LOG"
 
-# UPDATED 2025/10/20 - the first part of CODE does NOT seem to be utilized, so we just need the previous second value as the only value going forward
-#	TEMP="$(ls -1pd -- * | grep ^"${CODE#*|}" | grep '/'$ | head -1)"
 	TEMP="$(ls -1pd -- * | grep ^"$CODE" | grep '/'$ | head -1)"
 	[ ! "$TEMP" ] && {
-# UPDATED 2025/10/20 - the first part of CODE does NOT seem to be utilized, so we just need the previous second value as the only value going forward
-#		echo -e "Detected:\n$(ls -1pd -- * | grep ^"${CODE#*|}" | grep '/'$ | head -1)" >>"$LOG"
 		echo -e "Detected:\n$(ls -1pd -- * | grep ^"$CODE" | grep '/'$ | head -1)" >>"$LOG"
 		echo "ERROR: The source code directory could not be found." >>"$LOG"
 		stop failed
@@ -1370,8 +1243,6 @@ elif [ "$CODE" ]; then										# if we have a CODE value, then we need to chang
 		stop failed
 	}
 fi
-# REMOVED 2025/10/20 - this is not being used
-#DIR_CODE="$(pwd)"										# set the variable to the location of the source code
 
 if [ "$TYPE" = 'autoconf' ] && [ ! -e 'configure.ac' ]; then
 	echo "ERROR: It does not appear that builder was called from within the source code directory." >>"$LOG"
@@ -1463,8 +1334,6 @@ fi
 echo -e "\nGenerating the compile script..." | tee -a "$LOG"
 echo "#!/bin/sh" >"${DIR_TEMP}/${NAME}.build"
 echo >>"${DIR_TEMP}/${NAME}.build"
-# REMOVED 2025/10/20 - this is not being used
-#echo 'unset DIR_CODE DIR_CONF DIR_DUMP DIR_INCL DIR_INST DIR_MAKE DIR_MODS DIR_REPO DIR_TEMP DIR_XTRA' >>"${DIR_TEMP}/${NAME}.build"		# unset these variables set at the top of this script to not pollute the compile environment
 echo 'unset DIR_CONF DIR_DUMP DIR_INCL DIR_INST DIR_MAKE DIR_MODS DIR_REPO DIR_TEMP DIR_XTRA' >>"${DIR_TEMP}/${NAME}.build"		# unset these variables set at the top of this script to not pollute the compile environment
 echo 'unset DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS' >>"${DIR_TEMP}/${NAME}.build"
 echo 'unset DEP_MAKE_ALL' >>"${DIR_TEMP}/${NAME}.build"
@@ -1473,8 +1342,6 @@ echo 'unset OWN_USER OWN_GROUP' >>"${DIR_TEMP}/${NAME}.build"
 echo 'unset PRM_DIRS PRM_FILES PRM_EXECS' >>"${DIR_TEMP}/${NAME}.build"
 echo 'unset URL_CODE URL_REPO URL_INFO' >>"${DIR_TEMP}/${NAME}.build"
 echo 'unset SPM_ALL SPM_PAK SPM_UNL' >>"${DIR_TEMP}/${NAME}.build"
-# UPDATED 2017/11/04 - used to keep LOG exported for pre/post scripts
-#echo 'unset CPU LOG SUDO' >>"${DIR_TEMP}/${NAME}.build"
 echo 'unset CPU SUDO' >>"${DIR_TEMP}/${NAME}.build"
 echo 'unset DEBUG' >>"${DIR_TEMP}/${NAME}.build"
 echo "$EXPORTS" | sed 's/^[ \t]*//' >>"${DIR_TEMP}/${NAME}.build"
@@ -1521,8 +1388,6 @@ elif [ "$TYPE" = 'bootstrap' ]; then
 	[ -e bootstrap.sh ] && echo "./bootstrap.sh >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"
 	[ $CONF -eq 1 ] && { echo "./configure$TEMP $FLAG_CONF >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"; }
 elif [ "$TYPE" = 'cmake' ]; then
-# UPDATED 2017/09/22 - to use a different build directory (since some software requires that)
-#	echo "cmake $FLAG_CONF \"$(pwd)\" >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"
 	echo "mkdir build_me >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"
 	echo "cd build_me >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"
 	echo "cmake $FLAG_CONF .. >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"
@@ -1545,7 +1410,6 @@ fi
 	echo "echo -e \"   Proceeding with next steps of compile...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.build"
 }
 
-#if [ "$TYPE" != 'custom' ] && [ "$TYPE" != 'scons' ]; then
 if [ "$TYPE" != 'scons' ]; then
 	echo "make $FLAG_MAKE >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"		# NOTE: 'nice' should help prevent non-responding system crashes, and '-j' indicates to use all cores of a CPU during compiling
 	[ $CHECK -eq 1 ] && echo "make check >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.build"
@@ -1562,8 +1426,6 @@ echo -e "\nCompiling the software..." | tee -a "$LOG"
 echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
 TEMP=''
 for DIR in DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
-# UPDATED 2017/08/30 - to remove erroneous errors in the logs
-#	( [ "$(eval echo \$$DIR)" = '' ] || [ "$DIR" = 'DIR_MISC' ] ) && continue
 	( [ "$(eval echo \$$DIR)" = '' ] || [ "$DIR" = 'DIR_MISC' ] ) && [ ! -e "${DIR_INCL}/${DIR}" ] && [ ! -e "${DIR_INCL}.${PASS}/${DIR}" ] && continue
 	mkdir -p "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
 	[ "$PASS" ] && cp -dpR "${DIR_INCL}.${PASS}/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
@@ -1613,8 +1475,6 @@ fi
 
 # COMPILATION CLEANUP
 
-# UPDATED 2025/10/21 - removed erroneous directory checking location
-#if [ "$PASS" ] && ( [ -e "${DIR_CONF}/proper.${PASS}" ] || [ -e "${DIR_MAKE}/proper.${PASS}" ] ); then				# if doing multi-pass -AND- automatic cleanup is requested on this pass...
 if [ "$PASS" ] && [ -e "${DIR_MAKE}/proper.${PASS}" ]; then					# if doing multi-pass -AND- automatic cleanup is requested on this pass...
 	echo -e "\nCleaning the source code directory..." | tee -a "$LOG"
 
@@ -1624,8 +1484,6 @@ if [ "$PASS" ] && [ -e "${DIR_MAKE}/proper.${PASS}" ]; then					# if doing multi
 	else											# otherwise we are on one of the passes, so...
 		stop clean 0									#   perform a partial cleanup
 	fi
-# UPDATED 2025/10/21 - removed erroneous directory checking location
-#elif [ ! "$PASS" ] && ( [ -e "${DIR_CONF}/proper" ] || [ -e "${DIR_MAKE}/proper" ] ); then	# if only doing a single pass -AND- automatic cleanup is requested...
 elif [ ! "$PASS" ] && [ -e "${DIR_MAKE}/proper" ]; then						# if only doing a single pass -AND- automatic cleanup is requested...
 	echo -e "\nCleaning the source code directory..." | tee -a "$LOG"
 
@@ -1646,28 +1504,17 @@ fi
 [ "$PASS" ] && {
 	echo -e "\nStarting the next pass..." | tee -a "$LOG"
 
-# UPDATED 2025/10/17 - switched case to match pax
-#	TEMP='"$THIS" -n "$NAME" -a "$ARCH" -t "$TYPE"'
 	TEMP='"$THIS" -A "$ARCH" -T "$TYPE"'
-# UPDATED 2025/10/17 - switched case to match pax
-#	[ "$WGET" != '' ] && TEMP="$TEMP -c $WGET"
 	[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
-# REVERTED 2025/10/17 - moved from -d to -D
 	[ "$DIRS" ] && TEMP="$TEMP -D"
-	#[ "$PASS" ] && TEMP="$TEMP -p '$PASS'"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
+	#[ "$PASS" ] && TEMP="$TEMP -N '$PASS'"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
 	[ "$PATCH" ] && TEMP="$TEMP -P"
-# UPDATED 2025/10/17 - moved -s to -F
-#	[ "$SKIP" ] && TEMP="$TEMP -s"
 	[ "$SKIP" ] && TEMP="$TEMP -F"
-# UPDATED 2025/10/17 - switched case to match pax
-#	[ "$TRIM" ] && TEMP="$TEMP -r \"$TRIM\""
 	[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
 	[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
 
 	cd "$CWDL"
 
-# UPDATED 2025/10/17 - NAME is now the last parameter
-#	eval $TEMP
 	eval $TEMP "$NAME"
 	exit 0
 }

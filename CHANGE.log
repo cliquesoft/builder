@@ -7,7 +7,7 @@
 - Updated the --help output to match the new parameters
 
 2025/10/16
-- Reverted the -d to -D option
+- Reverted the -D to -d option
 - Swapped the -S to -C parameter
 - Swapped the -U to -u parameter
 - Combined the -c, -C, -d to be -c "dev|dir|repo"
@@ -19,12 +19,37 @@
 
 2025/10/17
 - Adjusted the parameter case to match pax
+- Removed the -n parameter and made it the last mandatory parameter
 - Reverted the -u to -U option
+- Swapped the -s to -F parameter
+- Swapped the -p to -N parameter
+- Added the -I parameter to install a builder profile
+- Updated package() when applying ownership and permissions
+- Updated package() to use SPM_MAK when making packages for versatility
+- Updated the --help output
 
 2025/10/20
 - Removed the DIR_CODE variable
+- Removed the first value for the CODE config variable (single value only)
+- Updated the -F switch to automatically supply the -P value
+- Replaced '-C dev' with '-C info'
+- Replaced '-C repo' with '-C dev'
+- Replaced URL_CODE with URL_REPO
+- Replaced URL_INFO with URL_CODE
+- Updated '-C info' to use URL_INFO
+- Updated the --help output
 
-
+2025/10/21
+- Removed erroneous directory checking location
 
 2026/02/04
 - Added the PATH_PKGCFG variable
+- Started creating the man page
+
+2026/02/05
+- Updated the example .info template
+- Moved where the config files are read so switches overwrite
+- Updated the directory locations for config files
+- Updated the directory locations for params files
+- Continued creating the man page
+
