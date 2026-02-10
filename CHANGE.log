@@ -53,3 +53,15 @@
 - Updated the directory locations for params files
 - Continued creating the man page
 
+2026/02/10
+- Added the 'file:' line to the .info files
+- Modified the 'commit:' line to include any additional path
+- Added the -I option
+- Updated the -C option to remove 'info' and add 'git'
+- Replaced 'download:' with 'repo:' in the .info files
+- Added 'download:' for software creators download link in the .info files
+- Added 'clone:' for git cloning in the .info files
+- Added 'git' as an option for -C
+- Added GIT_REPO to the config file
+- Updated the --help output
+

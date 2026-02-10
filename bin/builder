@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2025/10/21 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/02/10 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -71,8 +71,9 @@ export PRM_FILES='664'						# the permissions to apply to all files of the packa
 export PRM_EXECS='755'						# the permissions to apply to all executables in /bin, /sbin, etc and also the libraries
 
 export URL_CODE=''						# the developer URL used to obtain the package source code (set in a config file)
-export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_CODE}'		# the distro repo URL used to obtain the package source code
 export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_INFO}'		# the .info file URL used to obtain the package source code
+export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_CODE}'		# the distro repo URL used to obtain the package source code
+export GIT_REPO=''						# the online git repo that can be cloned
 
 export SPM_ALL='sudo pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
 export SPM_PAK='sudo pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
@@ -133,6 +134,7 @@ TEMPLATE=''							# creates a blank builder profile template and exit
 # [options]
 export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
 DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
+INFOFILE=''							# stores the info file to download/use to obtain the software
 export PASS=''							# the number of passes to make during compile (blank disables)
 PATCH=TRUE							# indicates we need to apply patches to the source code
 SKIP=''								# indicates we need to skip packaging until the final pass
@@ -474,22 +476,29 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo " configurations to tailor the software specifically for your distro."
 	echo
 	echo "  Usage:"
-	echo "	${THIS##*/} [-ceirt][-DFPSU][-A ARCH][-C ...][-N #][-R ...][-T ...] NAME"
+# UPDATED 2026/02/10
+#	echo "	${THIS##*/} [-DFIPSU][-A ARCH][-C ...][-N #][-R ...][-T ...]{-ceirt} NAME"
+	echo "	${THIS##*/} [OPTIONS] ACTION NAME"
 	echo
 	echo "  Actions:"
 	echo "	-c	only compile the software, no packaging"				# this is so that end users can simply download source code and build locally without having to package anything
 	echo "	-e	create a package .info file template"
+# VER2 - move the install directory into /var/cache/builder
 	echo "	-i	install the builder profile"						# installs the builder profile in /etc/builder so it can be used
 	echo "	-r	only re-package software instead of building"				# this will be useful if something in DIR_INCL gets updated (e.g. added a .desktop file); this can also sort a single package into multiple (e.g. bin, doc, lib, etc)
 	echo "	-t	create a builder profile template"
 	echo
-	echo "  Switches:"
+	echo "  Options:"
 	echo "	-A	the CPU architecture to build: ${CPU},all (default)"
 # VER2 - allow the user to obtain the files from git (implies '-C info'); split the info option as a separate command to get these values from it instead of config file
 	echo "	-C	obtain source code from:"
-	echo "			dev(eloper)|dir(ectory)|(distro)repo|info(file)"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'info' is the .info file in distro repo (URL_INFO in config); this is based on the 'download' and 'package' values in the .info file	WARN: this requires an existing .info file with certain values!
+# UPDATED 2026/02/10
+#	echo "			dev(eloper)|dir(ectory)|(distro)repo|info(file)"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'info' is the .info file in distro repo (URL_INFO in config); this is based on the 'download' and 'package' values in the .info file	WARN: this requires an existing .info file with certain values!
+# DOC NOTE: URL_CODE and GIT_REPO need to go in the config file for the project; URL_INFO and URL_REPO need to be placed in the /etc/builder/config file (with overwrites in the project config file
+	echo "			dev(eloper)|dir(ectory)|git(clone)|(distro)repo"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'git' is the online git repo to clone from (GIT_REPO in config); this is based on the 'git' and 'clone' values in the .info file	WARN: this requires an existing .info file with certain values!
 	echo "	-D	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
 	echo "	-F	skips packaging until final pass"
+	echo "	-I	uses the locations from a downloaded info file"
 	echo "	-N	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
 	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
 	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
@@ -582,7 +591,7 @@ elif [ "$1" = '--version' ]; then
 	head -5 $0 | grep Updated | sed "s/.*\\t//;s/ .*//;s:/:.:g"
 	exit 0
 else
-	while getopts A:cC:DeFin:N:PrR:StT:U OPTION; do		# NOTE: the 'A:' indicates that the '-A' switch requires a value!
+	while getopts A:cC:DeFiIN:PrR:StT:U OPTION; do		# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		case ${OPTION} in
 			A) ARCH="$OPTARG" ;;
 			c) NOPK=TRUE ;;
@@ -591,6 +600,7 @@ else
 			e) EXAMPLE=TRUE ;;
 			F) SKIP=TRUE ;;
 			i) INSTALL=TRUE ;;
+			I) INFOFILE=TRUE ;;
 			N) PASS="$OPTARG" ;;
 			P) PATCH='' ;;
 			r) REPK=TRUE ;;
@@ -678,22 +688,25 @@ else
 		echo "name:		${NAME}" >"${DIR_TEMP}/${NAME}.info"
 		echo "title:		Concise title" >>"${DIR_TEMP}/${NAME}.info"
 		echo "description:	Short description" >>"${DIR_TEMP}/${NAME}.info"
-		echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"
-		echo "homepage:	https://www.company.com/" >>"${DIR_TEMP}/${NAME}.info"
+		echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
 		echo "packaged:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
 		echo "released:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
-		echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
-		echo "git:		https://distributor.com/path/to/project/" >>"${DIR_TEMP}/${NAME}.info"
-		echo "commit:		abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"
-		echo "download:	http://domain.com/path/to/project/" >>"${DIR_TEMP}/${NAME}.info"
-		echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"
+		echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"
+		echo "homepage:	https://www.company.com/" >>"${DIR_TEMP}/${NAME}.info"					# 	NOTE: these are all appended to main URL (homepage, git, repo)
+		echo "download:	path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"					# oem direct download link from their website
+		echo "git:		https://distributor.com/path/to/project/" >>"${DIR_TEMP}/${NAME}.info"		# oem git url
+		echo "commit:		path/to/commit/abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"			# 	the commit that this package is based on (similar to version)
+		echo "file:		path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"				# files associated with that
+		echo "clone:		.git" >>"${DIR_TEMP}/${NAME}.info"						# to clone a repo locally
+		echo "repo:	http://domain.com/path/to/project/" >>"${DIR_TEMP}/${NAME}.info"			# linux distro repo url
+		echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"					# files associated with that
 		echo "source:		example-1.2.3.code" >>"${DIR_TEMP}/${NAME}.info"
 		echo "builder:	example-1.2.3.bldr" >>"${DIR_TEMP}/${NAME}.info"
 		echo "compile:	example-1.2.3.make" >>"${DIR_TEMP}/${NAME}.info"
 		echo "size:		100K" >>"${DIR_TEMP}/${NAME}.info"
 		echo "category:	system" >>"${DIR_TEMP}/${NAME}.info"
 		echo "interface:	gui	# valid values: cli,gui" >>"${DIR_TEMP}/${NAME}.info"
-		echo "toolkit:	gtk2	# possible values: shell|lua|ruby|php|python|tcl|tk|... (cli), gtk, fltk  plasma, html, ... (gui)" >>"${DIR_TEMP}/${NAME}.info"
+		echo "toolkit:	gtk2	# [CLI] shell|lua|ruby|php|python|tcl|tk|..., [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"
 		echo "rating:		g" >>"${DIR_TEMP}/${NAME}.info"
 		echo "license:	LGPLv2.1" >>"${DIR_TEMP}/${NAME}.info"
 		echo "document:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
@@ -795,6 +808,9 @@ else
 		echo "#     - if doing multi-pass, this needs to be in the first config file" >>config
 		echo "#     - this is optional but does allow a '-C dev' call" >>config
 		echo "URL_CODE=''" >>config
+		echo >>config
+		echo "# Same as above, but the URL to the online git repo for the project" >>config
+		echo "GIT_REPO=''" >>config
 		echo >>config
 		echo "# The below variable is optional and should only be used when compiling more" >>config
 		echo "# than one software with a single builder profile. For example you can compile" >>config
@@ -960,22 +976,28 @@ fi
 # PERFORM PASSED SWITCHES CHECKS
 
 [ "$SKIP" ] && [ ! "$PASS" ] && {
-	echo "ERROR: The '-F' switch requires a valid '-P' value." | tee -a "$LOG"
+	echo "ERROR: The '-F' option requires a valid '-P' value." | tee -a "$LOG"
 	exit 1
 }
 [ "$WGET" != '' ] && {
-	if [ "$WGET" != 'dev' ] || [ "$WGET" != 'dir' ] || [ "$WGET" != 'repo' ] || [ "$WGET" != 'info' ]; then
+# UPDATED 2026/02/10
+#	if [ "$WGET" != 'dev' ] || [ "$WGET" != 'dir' ] || [ "$WGET" != 'repo' ] || [ "$WGET" != 'info' ]; then
+	if ( ! echo "${WGET}" | grep -qE ^'(dev|dir|repo)'$ ); then
 		echo "ERROR: an invalid value for '-C' was passed."
 		exit 1
 	fi
 
 	TEMP=''
-	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) || ( [ "$WGET" = 'info' ] && [ ! "$URL_INFO" ] ) ) && {
+# UPDATED 2026/02/10
+#	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) || ( [ "$WGET" = 'info' ] && [ ! "$URL_INFO" ] ) ) && {
+	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'git' ] && [ ! "$GIT_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) ) && {
 		[ "$WGET" = 'dev' ] && TEMP='URL_CODE'
 		[ "$WGET" = 'dir' ] && TEMP='DIR_REPO'
+		[ "$WGET" = 'git' ] && TEMP='GIT_REPO'
 		[ "$WGET" = 'repo' ] && TEMP='URL_REPO'
-		[ "$WGET" = 'info' ] && TEMP='URL_INFO'
-		echo "ERROR: The '-C $WGET' switch requires a $TEMP value." | tee -a "$LOG"
+# REMOVED 2026/02/10
+#		[ "$WGET" = 'info' ] && TEMP='URL_INFO'
+		echo "ERROR: The '-C $WGET' option requires a $TEMP value." | tee -a "$LOG"
 		exit
 	}
 }
@@ -1142,13 +1164,45 @@ echo -e "\nInstalling compile-time dependencies..." | tee -a "$LOG"
 # FETCH SOURCE CODE
 
 if [ "$WGET" ]; then										# if we need to obtain the source code before we start, then...
-	echo -e "\nObtaining source code..." | tee -a "$LOG"
-
 	cd "${DIR_TEMP}/${NAME}" || {
 		echo "Calling: cd \"${DIR_TEMP}/${NAME}\"" >>"$LOG"
 		echo "ERROR: The temp directory could not be entered." >>"$LOG"
 		stop failed
 	}
+
+	if [ "$INFOFILE" ]; then
+		echo -e "\nObtaining information..." | tee -a "$LOG"
+
+		OARCH="$ARCH"									# temporarily store the old value
+		ARCH='all'
+		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply package name trimming beforehand
+		[ ! "$TRIM" ] && TEMP="$NAME"
+		TEMP="$(echo "$URL_INFO" | sed "s/\${NAME}/$TEMP/g")"				# make name substitution in the URL (e.g. liba52 > a52)
+		if [ -e "$(eval echo ${TEMP##*/})" ]; then					# if the .info file is already downloaded (to prevent an error below), then...
+			TEMP="$(eval echo ${TEMP##*/})"						#   store that filename
+		else										# otherwise
+			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
+			eval wget "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
+			TEMP="${URL_INFO##*/}"							#   store the filename that was just downloaded
+		fi
+		if [ ! -e "$(grep -e ^'package:' "${TEMP}" | sed 's/.*:\t//')" ]; then
+# UPDATED 2026/02/10
+#			TEMP="$(grep -e ^'download:' -e ^'package:' "${TEMP}" | sed -r 's/.*:\t//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
+			TEMP="$(grep -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
+			echo "Calling: wget \"$TEMP\"" >>"$LOG"
+			wget "$TEMP" 2>>"$LOG" || stop failed
+		fi
+		ARCH="$OARCH"									# restore the prior value
+		unset $OARCH									# get rid of that variable
+
+		# now set the variable values for the below code blocks
+		[ "$WGET" = 'dev' ] && URL_CODE="$(grep -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+		[ "$WGET" = 'git' ] && GIT_REPO="$(grep -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+		[ "$WGET" = 'repo' ] && URL_REPO="$(grep -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+	fi
+
+	echo -e "\nObtaining source code..." | tee -a "$LOG"
+
 	[ "$WGET" = 'dir' ] && {
 		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
@@ -1172,54 +1226,66 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
 		if [ ! -e "$(eval echo ${TEMP}${EXT_CODE})" ]; then
-			TEMP="$(echo "$URL_CODE" | sed "s/$NAME/$TEMP/g")"			# make name substitution in the URL (e.g. liba52 > a52)
+			TEMP="$(echo "$URL_CODE" | sed "s/\${NAME}/${TEMP}/g")"			# make name substitution in the URL (e.g. liba52 > a52)
 			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
 			eval wget "$TEMP" 2>>"$LOG" || stop failed
+		fi
+	}
+	[ "$WGET" = 'git' ] && {
+		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
+		[ ! "$TRIM" ] && TEMP="$NAME"
+		if [ ! -e ".git" ]; then
+			TEMP="$(echo "$GIT_REPO" | sed "s/\${NAME}/$TEMP/g")"			# make name substitution in the URL (e.g. liba52 > a52)
+			eval echo "Calling: git clone \"$TEMP\"" >>"$LOG"
+			eval git clone "$TEMP" 2>>"$LOG" || stop failed
 		fi
 	}
 	[ "$WGET" = 'repo' ] && {
 		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply the trim beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
 		if [ ! -e "$(eval echo ${TEMP}${EXT_CODE})" ]; then
-			TEMP="$(echo "$URL_REPO" | sed "s/$NAME/$TEMP/g")"			# make name substitution in the URL (e.g. liba52 > a52)
+			TEMP="$(echo "$URL_REPO" | sed "s/\${NAME}/$TEMP/g")"			# make name substitution in the URL (e.g. liba52 > a52)
 			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
 			eval wget "$TEMP" 2>>"$LOG" || stop failed
 		fi
 	}
-	[ "$WGET" = 'info' ] && {
-		OARCH="$ARCH"									# temporarily store the old value
-		ARCH='all'
-		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply package name trimming beforehand
-		[ ! "$TRIM" ] && TEMP="$NAME"
-		TEMP="$(echo "$URL_INFO" | sed "s/$NAME/$TEMP/g")"				# make name substitution in the URL (e.g. liba52 > a52)
-		if [ -e "$(eval echo ${TEMP##*/})" ]; then					# if the .info file is already downloaded (to prevent an error below), then...
-			TEMP="$(eval echo ${TEMP##*/})"						#   store that filename
-		else										# otherwise
-			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
-			eval wget "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
-# UPDATED 2026/02/05
-#			TEMP="$(ls -1t | head -1)"						#   store the filename that was just downloaded
-			TEMP="${URL_INFO##*/}"							#   store the filename that was just downloaded
-		fi
-		if [ ! -e "$(grep -e ^'package:' "${TEMP}" | sed 's/.*:\t//')" ]; then
-			TEMP="$(grep -e ^'download:' -e ^'package:' "${TEMP}" | sed 's/.*:\t//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
-			echo "Calling: wget \"$TEMP\"" >>"$LOG"
-			wget "$TEMP" 2>>"$LOG" || stop failed
-		fi
-		ARCH="$OARCH"									# restore the prior value
-		unset $OARCH									# get rid of that variable
-	}
+# MOVED 2026/02/10 - this needs to be moved at the top of this 'if' block so the -C option can execute correctly
+#	[ "$WGET" = 'info' ] && {
+#		OARCH="$ARCH"									# temporarily store the old value
+#		ARCH='all'
+#		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply package name trimming beforehand
+#		[ ! "$TRIM" ] && TEMP="$NAME"
+#		TEMP="$(echo "$URL_INFO" | sed "s/$NAME/$TEMP/g")"				# make name substitution in the URL (e.g. liba52 > a52)
+#		if [ -e "$(eval echo ${TEMP##*/})" ]; then					# if the .info file is already downloaded (to prevent an error below), then...
+#			TEMP="$(eval echo ${TEMP##*/})"						#   store that filename
+#		else										# otherwise
+#			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
+#			eval wget "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
+## UPDATED 2026/02/05
+##			TEMP="$(ls -1t | head -1)"						#   store the filename that was just downloaded
+#			TEMP="${URL_INFO##*/}"							#   store the filename that was just downloaded
+#		fi
+#		if [ ! -e "$(grep -e ^'package:' "${TEMP}" | sed 's/.*:\t//')" ]; then
+#			TEMP="$(grep -e ^'download:' -e ^'package:' "${TEMP}" | sed 's/.*:\t//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
+#			echo "Calling: wget \"$TEMP\"" >>"$LOG"
+#			wget "$TEMP" 2>>"$LOG" || stop failed
+#		fi
+#		ARCH="$OARCH"									# restore the prior value
+#		unset $OARCH									# get rid of that variable
+#	}
 
-	TEMP="$(ls -1t | head -1)"								# store the filename that was just downloaded
-	echo "Source Code File: $TEMP" >>"$LOG"
-	case $(file -b --mime-type "$TEMP") in
-		'application/zip') unzip "$TEMP" 2>>"$LOG" ;;
-		'application/x-gzip') tar -xzf "$TEMP" 2>>"$LOG" ;;
-		'application/x-bzip2')
-			[ ! -e "${TEMP%.*}" ] && bunzip2 "$TEMP" 2>>"$LOG"			# if the file is already uncompressed, then...
-			tar -xf "${TEMP%.*}" 2>>"$LOG"
-			;;
-	esac
+	if [ "$WGET" != 'git' ]; then								# if we're not cloing a git repo (since it would already be uncompressed files), then...
+		TEMP="$(ls -1t | head -1)"							#    store the filename that was just downloaded
+		echo "Source Code File: $TEMP" >>"$LOG"
+		case $(file -b --mime-type "$TEMP") in
+			'application/zip') unzip "$TEMP" 2>>"$LOG" ;;
+			'application/x-gzip') tar -xzf "$TEMP" 2>>"$LOG" ;;
+			'application/x-bzip2')
+				[ ! -e "${TEMP%.*}" ] && bunzip2 "$TEMP" 2>>"$LOG"		#    if the file is already uncompressed, then...
+				tar -xf "${TEMP%.*}" 2>>"$LOG"
+				;;
+		esac
+	fi
 	echo -e "Detected:\n$(ls -tdpr -- * | grep '/'$)" >>"$LOG"
 	cd "$(ls -tdpr -- * | grep '/'$ | head -1)" 2>>"$LOG" || {				# change into the directory created by the uncompression above (source code directory)	https://unix.stackexchange.com/questions/136976/get-the-latest-directory-not-the-latest-file
 		echo "Calling: cd \"$(ls -tdr -- * | grep '/'$ | head -1)\"" >>"$LOG"
