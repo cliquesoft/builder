@@ -65,3 +65,16 @@
 - Added GIT_REPO to the config file
 - Updated the --help output
 
+2026/02/11
+- Updated to use more locations for config files
+- Updated the .info file line parsing to be case insensitive
+- Added a check for git when passing '-C git'
+- Fixed a bug that loaded the config file instead of the params file
+- Added all the files that can be used with the -t action
+- Expanded the CPU architectures to include generic ARM 32 and 64bit
+- Updated the EXPORTS variable to multiple variables due to assignment bug
+- Moved the params and two config files sourcing to the top of the script
+- Re-arranged code so that error checks are before action execution
+- Added additional checks
+- Renamed /etc/builder/builder.conf to /etc/builder/config
+

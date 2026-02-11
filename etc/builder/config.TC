@@ -74,8 +74,8 @@ PRM_EXECS='755'
 
 # The URL's that can be used to obtain the source code and package information
 # NOTE: a blank value disables
-URL_REPO='$(cat /opt/tcemirror)/$(version | cut -d '.' -f 1).x/$(uname -m)/tcz/src/${NAME}/${NAME}${EXT_CODE}'
 URL_INFO='$(cat /opt/tcemirror)/$(version | cut -d '.' -f 1).x/$(uname -m)/tcz/${NAME}${EXT_INFO}'
+URL_REPO='$(cat /opt/tcemirror)/$(version | cut -d '.' -f 1).x/$(uname -m)/tcz/src/${NAME}/${NAME}${EXT_CODE}'
 
 # The software package manager commands to...
 # ...install compile-time dependencies for the overall compiling environment
@@ -87,9 +87,6 @@ SPM_MAK='mksquashfs "${DIR}.${PACK}" "${DIR}${TMP_SOFT}" && find "${DIR}.${PACK}
 # ...unload them (to keep the environment clean)
 SPM_UNL=''
 
-# The CPU architectures that you wish to compile for (comma separated)
-#CPU='i32,i64,r32,r64'
-
 # The log file for compile output (contains both stdout and stderr)
 #LOG='/var/log/builder.log'
 
@@ -100,29 +97,42 @@ SPM_UNL=''
 SUDO=TRUE
 
 
-# Set default compile flags per CPU architecture (which can be overwritten with
-# individual DIR_MAKE files)
-#if [ "$2" = 'i32' ]; then
-#	EXPORTS="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
-#		export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
-#		export LDFLAGS='-Wl,-O1'
-#		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
-#elif [ "$2" = 'i64' ]; then
-#	EXPORTS="export CFLAGS='-mtune=generic -Os -pipe'
-#		export CXXFLAGS='-mtune=generic -Os -pipe'
-#		export LDFLAGS='-Wl,-O1'
-#		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
-#elif [ "$2" = 'r32' ]; then
-#	EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
-#		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
-#		export LDFLAGS='-Wl,-O1'
-#		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
-#elif [ "$2" = 'r64' ]; then
-#	EXPORTS="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
-#		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
-#		export LDFLAGS='-Wl,-O1'
-#		export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
-#fi
+# Set the default package config search location(s)
+PATH_PKGCFG="/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"
+
+# Set the default compile flags per CPU architecture (which can be overwritten
+# with individual DIR_MAKE files)
+if [ "$ARCH" = 'a32' ]; then
+	EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+		export LDFLAGS='-Wl,-O1'
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
+elif [ "$ARCH" = 'a64' ]; then
+	EXPORTS="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+		export LDFLAGS='-Wl,-O1'
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
+elif [ "$ARCH" = 'i32' ]; then
+	EXPORTS="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
+		export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
+		export LDFLAGS='-Wl,-O1'
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
+elif [ "$ARCH" = 'i64' ]; then
+	EXPORTS="export CFLAGS='-mtune=generic -Os -pipe'
+		export CXXFLAGS='-mtune=generic -Os -pipe'
+		export LDFLAGS='-Wl,-O1'
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
+elif [ "$ARCH" = 'r32' ]; then
+	EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+		export LDFLAGS='-Wl,-O1'
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
+elif [ "$ARCH" = 'r64' ]; then
+	EXPORTS="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+		export LDFLAGS='-Wl,-O1'
+		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
+fi
 
 
 # Whether or not to show debug output during processing
