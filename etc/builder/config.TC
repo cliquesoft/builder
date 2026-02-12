@@ -3,9 +3,6 @@
 #   NAME	the name of the package being compiled
 #   PACK	the type of package being made (e.g. bin, dev, doc, ...)
 #   PASS	the current pass count for multi-pass compiling
-#
-# NOTE: the below value can NOT be adjusted here since it is a circular value
-# DIR_CONF='/etc/builder'
 
 
 
@@ -14,28 +11,17 @@
 # for making the various packages
 #DIR_DUMP='/tmp/staging'
 
-# This will store the directory structure and files to include in the package:
-#	usr/local/share/applications/foo.desktop, usr/local/tce.installed/foo, ...
-#DIR_INCL='${DIR_CONF}/${NAME}/include'
-
 # The directory where the package contents will reside in the running system
-#DIR_INST='/usr/local'
+DIR_INST='/usr/local'
 
 # This will store individual compile parameters for each package
-#DIR_MAKE="${DIR_CONF}/${NAME}"
-
-# This will store any modifications/patches that need to be made to the source
-# code before compiling occurs
-#DIR_MODS="${DIR_CONF}/${NAME}/patches"
+DIR_PROF="${DIR_INST}/share/builder/${NAME}"
 
 # The location that the packaged software will be stored (local software repo)
 #DIR_REPO='/tmp/repo'
 
 # The temporary location to store any information needed by this script
 #DIR_TEMP='/tmp/builder'
-
-# This will store any files that are used to compile (e.g. httpd.conf for php)
-#DIR_XTRA="${DIR_CONF}/${NAME}/extras"
 
 
 # directory locations used with 'DIR_INST' (equilent to PREFIX when 'configuring')
@@ -55,11 +41,13 @@ DEP_MAKE_ALL='compiletc.tcz squashfs-tools.tcz rsync.tcz findutils.tcz'
 
 # The file extensions for the various packages created by this script
 # NOTE: if including variables in the name, surround with single quotes (')
+EXT_BLDR='.bldr'
 EXT_CODE='.tgz'
 EXT_DEPS='-${PACK}.tcz.dep'
 EXT_HASH='-${PACK}.tcz.md5.txt'
 EXT_INFO='-${PACK}.tcz.info'
 EXT_LIST='-${PACK}.tcz.list'
+EXT_MAKE='-${PACK}.tcz.make'
 EXT_SOFT='-${PACK}.tcz'
 
 
@@ -81,11 +69,11 @@ URL_REPO='$(cat /opt/tcemirror)/$(version | cut -d '.' -f 1).x/$(uname -m)/tcz/s
 # ...install compile-time dependencies for the overall compiling environment
 SPM_ALL='tce-load -w $DEP_MAKE_ALL; tce-load -il $DEP_MAKE_ALL'
 # ...install compile-time dependencies for those that are package specific
-SPM_PAK='tce-load -w $DEP_MAKE_PAK; tce-load -il $DEP_MAKE_PAK'
+SPM_PACK='tce-load -w $DEP_MAKE_PAK; tce-load -il $DEP_MAKE_PAK'
 # ...create packages from compiled software
-SPM_MAK='mksquashfs "${DIR}.${PACK}" "${DIR}${TMP_SOFT}" && find "${DIR}.${PACK}" -not -type d | sed "s:^${DIR}.${PACK}/::" >"${DIR}${TMP_LIST}" && md5sum "${DIR}${TMP_SOFT}" >"${DIR}${TMP_HASH}"'
+SPM_MAKE='mksquashfs "${DIR}.${PACK}" "${DIR}${TMP_SOFT}" && find "${DIR}.${PACK}" -not -type d | sed "s:^${DIR}.${PACK}/::" >"${DIR}${TMP_LIST}" && md5sum "${DIR}${TMP_SOFT}" >"${DIR}${TMP_HASH}"'
 # ...unload them (to keep the environment clean)
-SPM_UNL=''
+SPM_UNLD=''
 
 # The log file for compile output (contains both stdout and stderr)
 #LOG='/var/log/builder.log'
@@ -102,37 +90,30 @@ PATH_PKGCFG="/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"
 
 # Set the default compile flags per CPU architecture (which can be overwritten
 # with individual DIR_MAKE files)
-if [ "$ARCH" = 'a32' ]; then
-	EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
-		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
-		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
-elif [ "$ARCH" = 'a64' ]; then
-	EXPORTS="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
-		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
-		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
-elif [ "$ARCH" = 'i32' ]; then
-	EXPORTS="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
-		export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
-		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
-elif [ "$ARCH" = 'i64' ]; then
-	EXPORTS="export CFLAGS='-mtune=generic -Os -pipe'
-		export CXXFLAGS='-mtune=generic -Os -pipe'
-		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
-elif [ "$ARCH" = 'r32' ]; then
-	EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
-		export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
-		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
-elif [ "$ARCH" = 'r64' ]; then
-	EXPORTS="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
-		export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
-		export LDFLAGS='-Wl,-O1'
-		export PKG_CONFIG_PATH='${PATH_PKGCFG}'"
-fi
+FLAG_A32="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+	export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+	export LDFLAGS='-Wl,-O1'
+	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"			# ARM 32bit
+FLAG_A64="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+	export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+	export LDFLAGS='-Wl,-O1'
+	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"			# ARM 64bit
+FLAG_I32="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
+	export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
+	export LDFLAGS='-Wl,-O1'
+	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"			# Intel/AMD 32bit
+FLAG_I64="export CFLAGS='-mtune=generic -Os -pipe'
+	export CXXFLAGS='-mtune=generic -Os -pipe'
+	export LDFLAGS='-Wl,-O1'
+	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"			# Intel/AMD 64bit
+FLAG_R32="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+	export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+	export LDFLAGS='-Wl,-O1'
+	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"			# RPi 32bit
+FLAG_R64="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+	export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
+	export LDFLAGS='-Wl,-O1'
+	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"			# RPi 64bit
 
 
 # Whether or not to show debug output during processing

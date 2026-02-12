@@ -78,3 +78,25 @@
 - Added additional checks
 - Renamed /etc/builder/builder.conf to /etc/builder/config
 
+2026/02/12
+- Added the -b action to satisfy certain checks
+- Added the -d action
+- Added the -p action
+- Merged the -e and -t actions
+- Updated an outdated error message in the option checking code
+- Updated the -U option to be an opt-in switch
+- Renamed COMPILE to CUSTOM
+- Renamed NOPK to COMPILE
+- Renamed REPK to REPACK
+- Renamed SPAK to SINGLE
+- Renamed SPM_PAK to SPM_PACK
+- Renamed SPM_MAK to SPM_MAKE
+- Renamed SPM_UNL to SPM_MAKE
+- Removed DIR_INCL
+- Removed DIR_MODS
+- Removed DIR_XTRA
+- Completed the EXPORTS transition
+- Renamed the .build script to use EXT_MAKE to generate a make file
+- Updated the sudo calls to use SUDO
+- Updated the --help output
+

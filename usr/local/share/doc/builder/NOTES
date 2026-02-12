@@ -87,19 +87,18 @@ Order of operations
 
 Example directory structure
 
-	/etc/builder/ builder.conf				# global config file that personalizes the global variables set of top of script
-	/etc/builder/ proper					# a flag (empty file) that indicates cleanup should occur automatically without prompt for each compiled package
-	/etc/builder/ foo/config[.1,.2,...]			# individual package files with specifics if the general compile options don't fit (see below)	NOTE: this is run while in the DIR_DUMP/NAME directory
-	/etc/builder/ foo/cleanup				# a script that will be executed to further clean up the file system
-	/etc/builder/ foo/params				# instead of passing the parameters on the command line, this file can be used instead
-	/etc/builder/ foo/pre.compile[.1,.2,...]		# a pre-compile script that can get run to perform any neccessary specific adjustments		NOTE: this is run while in the source code directory
-	/etc/builder/ foo/post.compile[.1,.2,...]		# same as above, but run post-compile								NOTE: this is run while in the source code directory
-	/etc/builder/ foo/pre.package[.1,.2,...]		# a pre-package script that can get run to perform any neccessary specific adjustments		NOTE: this is run while in the DIR_DUMP directory
-	/etc/builder/ foo/post.package[.1,.2,...]		# same as above, but run post-package								NOTE: this is run while in the DIR_DUMP directory
-	/etc/builder/ foo/proper[.1,.2,...]			# same as top of 'proper' flag, but just for this package
-	/etc/builder/ foo/extras/ usr/local/tce.installed/foo	# stores any files that are not part of 'include' (e.g. httpd.conf for php compile); useful when DIRS=TRUE
-	/etc/builder/ foo/include[.1,.2,...]/ [VAR]/foo.conf	# contains things like .desktop files, icons, install markers/scripts, service scripts, etc	NOTE: you can put things under directories like 'DIR_BIN/foo' to get copied into the directory tree associated with the DIR_BIN value (e.g. DIR_BIN='${DIR_INST}/bin' > /usr/local/bin/foo)
-	/etc/builder/ foo/patches[.1,.2,...]/ xyz_patch.cpp	# contains any distro specific patches to be applied pre-compile
+	/etc/builder/ config					# global config file that personalizes the global variables set of top of script
+	/var/cache/builder/ foo/config[.1,.2,...]		# individual package files with specifics if the general compile options don't fit (see below)	NOTE: this is run while in the DIR_DUMP/NAME directory
+	/var/cache/builder/ foo/cleanup				# a script that will be executed to further clean up the file system
+	/var/cache/builder/ foo/params				# instead of passing the parameters on the command line, this file can be used instead
+	/var/cache/builder/ foo/pre.compile[.1,.2,...]		# a pre-compile script that can get run to perform any neccessary specific adjustments		NOTE: this is run while in the source code directory
+	/var/cache/builder/ foo/post.compile[.1,.2,...]		# same as above, but run post-compile								NOTE: this is run while in the source code directory
+	/var/cache/builder/ foo/pre.package[.1,.2,...]		# a pre-package script that can get run to perform any neccessary specific adjustments		NOTE: this is run while in the DIR_DUMP directory
+	/var/cache/builder/ foo/post.package[.1,.2,...]		# same as above, but run post-package								NOTE: this is run while in the DIR_DUMP directory
+	/var/cache/builder/ foo/proper[.1,.2,...]		# a flag (empty file) that indicates cleanup should occur automatically without prompt for each compiled package
+	/var/cache/builder/ foo/extras/ usr/local/tce.installed/foo	# stores any files that are not part of 'include' (e.g. httpd.conf for php compile); useful when DIRS=TRUE
+	/var/cache/builder/ foo/include[.1,.2,...]/ [VAR]/foo.conf	# contains things like .desktop files, icons, install markers/scripts, service scripts, etc	NOTE: you can put things under directories like 'DIR_BIN/foo' to get copied into the directory tree associated with the DIR_BIN value (e.g. DIR_BIN='${DIR_INST}/bin' > /usr/local/bin/foo)
+	/var/cache/builder/ foo/patches[.1,.2,...]/ xyz_patch.cpp	# contains any distro specific patches to be applied pre-compile
 	/tmp/builder/						# the temporary location to store any information and files needed by this script
 	/tmp/staging/						# the staging location that stores the compiled software where it gets split and packaged
 	/tmp/repo/						# contains all the packaged software to be moved into an online repo
@@ -122,7 +121,7 @@ Example foo/config		  NOTE: these are comprehensive or complementary
 	# NOTES:
 	#     - if doing multi-pass, this needs to be in the first config file
 	#     - this is optional but does allow a '-C dev' call
-	URL_CODE=''" >>config
+	URL_CODE=''
 
 	# The below variable is optional and should only be used when compiling
 	# more than one software with a single builder profile. For example you

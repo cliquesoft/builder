@@ -1,4 +1,4 @@
-.\"Man page for pax, by Dave Henderson.
+.\"Man page for builder, by Dave Henderson.
 .TH pax 1 "2026 February 04"
 .SH NAME
 \fIbuilder\fR - package builder
@@ -7,48 +7,40 @@
 
 
 .SH SYNOPSIS
-.B builder [OPTIONS] ACTION {PACKAGE(S)|FILELIST} [DIRECTORY]
+.B builder [OPTIONS] ACTION NAME
 
 ACTIONS:
-  -c   copy local packages to another directory
-  -d   download package(s) only
-  -e   extract local package(s) contents
-  -f   find which local package(s) a file belongs to
-  -i   install package(s)
-  -l   list all currently installed packages
-  -m   make a new package (requires DIRECTORY)
-  -o   open a fifo for (remote) communication
-  -t   show the dependency trees of package(s): relies, reliant
-  -u   uninstall package(s): update, unload, unlist, delete, purge
-  -v   validate package(s) info: data, hash, deps, fix
-  -z   populates DIR_LIST with package files'
+  -b   build a distributable package
+  -c   compile the software only, no packaging
+  -d   download the builder profile (uses URL_REPO)
+  -i   install the builder profile
+  -p   create a builder profile
+  -r   only re-package software instead of building
+  -t   create a package template: info, profile
 
   --help      shows this screen
-  --install   installs pax as the default package manager
-  --uninstall uninstalls pax as the default package manager
   --version   displays the software version
 
 OPTIONS:
-  -B   indicates we are currently booting the system
-  -C   specifies an alternative CPU architecture: i32, i64, r32, r64
-  -D   dependency handling: none, default, all, source
-  -E   include extra package files: all, code, cpio, info, list, make
-  -F   force the ACTION to take place
-  -I   list of dependencies to ignore
-  -K   specifies an alternative kernel name
-  -L   the list to adjust: none, boot, live
-  -M   defines the package install mode: copy, link (default)
-  -N   do NOT install all files in the package, just those specified
-  -O   display output format: fifo, text, xml, xmLive
-  -P   prompt before taking action
-  -Q   quiets the output: all, errors, default, verbose, none
-  -R   the action applies to restore points
-  -S   changes the source directory/repo to obtain software from
-  -T   specifies the package type: bin, dev, doc, drv, gir, lib, loc
-  -V   the specific version of a package to install
-  -X   obtain packages via proxy using another device
-  -Y   performs a dry run of the action
-  -Z   add color to the output
+  -A   the CPU architecture to build: a32,a64,i32,i64,r32,r64,all (default)
+  -C   obtain source code from:
+          dev(eloper)|dir(ectory)|git(clone)|(distro)repo
+  -D   package using directories in DIR_DUMP instead of NAME value
+  -F   skips packaging until final pass
+  -I   downloaded the package info file and use its locations
+  -N   the number of passes to make when compiling
+  -P   prevent patching from occurring
+  -R   remove a portion of NAME when packaging; can use regex anchors
+  -S   package all contents in a single package - do NOT separate
+  -T   the compile type to use:
+          autoconf
+          autogen
+          bootstrap
+          cmake
+          custom
+          default (configure, make, make install)
+          scons
+  -U   do not unload compilation packages afterwards
 
 
 
@@ -69,7 +61,9 @@ OPTIONS:
 
 
 .SH DESCRIPTION
-.I pax
+.I builder
+
+
 is a lightweight, robust, and versatile package manager for Linux distros.
 While not quite as feature rich as the apt/dpkg Debian system, pax also is
 a fraction of its size (almost a 10th at 200kb)! The development of this
