@@ -34,16 +34,10 @@ export DEBUG=0							# whether or not to show debug output during processing
 
 export DIR_CONF='/etc/builder'					# the location of the configuration for this script	NOTE: this can't be changed in the 'config' file since we have to use this value to find the file itself!
 export DIR_DUMP='/tmp/staging'					# the staging location that will be the target to dump compiled programs into for making the various packages
-# REMOVED 2026/02/12
-#export DIR_INCL='${DIR_CONF}/${NAME}/include'			# this will store the directory structure and files to include in the package (e.g. usr/local/share/applications/foo.desktop, usr/local/tce.installed/foo, ...)
 export DIR_INST=''						# the directory where the package contents will reside in the running system; blank=root directory
 export DIR_PROF='/var/cache/builder/${NAME}'			# this will store individual compile parameters for each package
-# REMOVED 2026/02/12
-#export DIR_MODS='${DIR_CONF}/${NAME}/patches'			# this will store any modifications/patches that need to be made to the source code before compiling occurs
 export DIR_REPO='/tmp/repo'					# the location that the packaged software will be stored and source code is found (when using '-C dir') - the local software repository
 export DIR_TEMP='/tmp/builder'					# the temporary location to store any information and files needed by this script
-# REMOVED 2026/02/12
-#export DIR_XTRA='${DIR_CONF}/${NAME}/extras'			# this will store any files that are used to compile (e.g. httpd.conf for php); useful when DIRS=TRUE
 
 export DIR_BIN="${DIR_INST}/bin"				# directory locations used with 'DIR_INST' (equilent to PREFIX when 'configuring')
 export DIR_ETC="${DIR_INST}/etc"
@@ -53,8 +47,6 @@ export DIR_SHARE="${DIR_INST}/share"
 export DIR_VAR="/var"
 export DIR_MARKERS="${DIR_INST}/tce.installed"
 export DIR_SCRIPTS="${DIR_INST}/etc/init.d"
-
-export PATH_PKGCFG="/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"  # the default PKG_CONFIG_PATH value
 
 export DEP_MAKE_ALL='compiletc squashfs_tools rsync find_utils'	# compile-time deps list for all projects (e.g. compiletc, mksquashfs-tools, ...)
 export DEP_MAKE_PAK=''						# compile-time deps list for the current project
@@ -75,10 +67,10 @@ export PRM_DIRS='775'						# the permissions to apply to directories of the pack
 export PRM_FILES='664'						# the permissions to apply to all files of the package
 export PRM_EXECS='755'						# the permissions to apply to all executables in /bin, /sbin, etc and also the libraries
 
+export GIT_REPO=''						# the online git repo that can be cloned (set in a package config file)
 export URL_CODE=''						# the developer URL used to obtain the package source code (set in a package config file)
 export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_INFO}'		# the .info file URL used to obtain the package source code (set in builder config file)
 export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_CODE}'		# the distro repo URL used to obtain the package source code (set in builder config file)
-export GIT_REPO=''						# the online git repo that can be cloned (set in a package config file)
 
 export SPM_ALL='$SUDO pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
 export SPM_PACK='$SUDO pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
@@ -87,6 +79,8 @@ export SPM_UNLD='$SUDO pax -u $DEP_MAKE_PAK'			# the software package manager co
 
 export LOG='/var/log/builder - ${NAME}.log'			# the log file for compile output (contains both stdout and stderr)
 export SUDO=''							# whether or not 'sudo' should be called for all commands after the 'ownership and permissions' have been set (if they are restrictive enough to warrant it)
+
+PATH_PKGCFG="/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"  # the default PKG_CONFIG_PATH value
 
 # set default compile flags (which can be overwritten with DIR_CONF or individual DIR_PROF configs)
 # NOTE: additional flags can also be set in this variable as well (e.g. LC_CTYPE, QT_IM_MODULE, GTK_IM_MODULE, ...)
@@ -127,7 +121,7 @@ FLAG_R64="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 THIS="$0"							# stores this script for multi-pass calls
 CPU='a32,a64,i32,i64,r32,r64'					# the CPU architectures that you wish to compile for (comma separated): ARM 32/64bit, Intel/AMD 32/64bit, RPi 32/64big
 CWDL="$(pwd)"							# stores the current working directory location
-EXPORTS=''							# defines which compile flags to export for the desired CPU architecture
+EXPORTS=''							# the exported compile flags based on the desired CPU architecture
 export PACK=''							# the type of package being made (e.g. bin, dev, doc, ...)
 SORT=''								# indicates we need to sort the package contents on this pass
 TEMP=''								# stores a temporary value
@@ -137,11 +131,7 @@ export NAME=''							# the name of the package being compiled
 
 # [actions]
 BUILD=''							# if we need to build a software package
-# UPDATED 2026/02/12
-#EXAMPLE=''							# if we need to generate an example .info file and exit
 INSTALL=''							# indicates we need to install the builder profile
-# UPDATED 2026/02/12
-#export NOPK=''							# indicates that NO packaging should take place, only a software compile
 COMPILE=''							# indicates that NO packaging should take place, only a software compile
 PROFILE=''							# create a builder profile
 REPACK=''							# indicates that we just need to repack the software since something in the 'include' directories changed
@@ -168,8 +158,6 @@ PROP=0								# indicates that the 'make mrproper' step is necessary (mostly for
 TEST=0								# indicates that the 'make test' step is requested to be made during compile
 CODE=''								# when compiling multiple softwares with a single builder profile (e.g. alsa-lib, alsa-utils), this value uniquely identifies the package per pass (e.g. config.1 > CODE='alsa-lib'; config.2 > CODE='alsa-utils')
 
-# UPDATED 2026/02/12
-#COMPILE=''							# used when TYPE='custom'
 CUSTOM=''							# used when TYPE='custom'
 
 CFG_BIN=""							# DIR_INST/bin	directory locations used with 'configure'
@@ -355,25 +343,25 @@ package() {
 	fi
 
 	# NOTE: we should only apply ownership and permissions on the final pass!!!
-	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then							# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
-		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"	# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when TYPE=custom (e.g. FXwm)
+	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then						# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
+		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"		# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when TYPE=custom (e.g. FXwm)
 		for DIR in $NAMES; do
 			for PACK in $TEMP; do
-				[ ! -d "${DIR_DUMP}/${DIR}.${PACK}" ] && continue	# if a directory is missing then there's no reason to process something that doesn't exist!
+				[ ! -d "${DIR_DUMP}/${DIR}.${PACK}" ] && continue		# if a directory is missing then there's no reason to process something that doesn't exist!
 
-				cd "${DIR_DUMP}/${DIR}.${PACK}" 2>>"$LOG" || {		# change into the temp packaging directory
+				cd "${DIR_DUMP}/${DIR}.${PACK}" 2>>"$LOG" || {			# change into the temp packaging directory
 					echo "Calling: cd \"${DIR_DUMP}/${DIR}.${PACK}\"" >>"$LOG"
 					echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
 					stop failed
 				}
-				find . \( -type f -exec chmod $PRM_FILES {} \; \) , \( -type d -exec chmod $PRM_DIRS {} \; \)				# update the permissions of all the package contents	https://stackoverflow.com/questions/3740152/how-do-i-set-chmod-for-a-folder-and-all-of-its-subfolders-and-files-in-linux-ubu
+				find . \( -type f -exec chmod $PRM_FILES {} \; \) , \( -type d -exec chmod $PRM_DIRS {} \; \)			# update the permissions of all the package contents	https://stackoverflow.com/questions/3740152/how-do-i-set-chmod-for-a-folder-and-all-of-its-subfolders-and-files-in-linux-ubu
 				find ".${DIR_MARKERS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
 				find ".${DIR_SCRIPTS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
-				find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null			# update the permissions of all the libraries
+				find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null		# update the permissions of all the libraries
 				find ".${DIR_INST}/lib64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
-				find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null					# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
-				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null				# update these directory contents to be executable
-				eval $SUDO chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>"$LOG" 2>&1								# update the ownership of all the package contents
+				find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null				# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
+				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null			# update these directory contents to be executable
+				eval $SUDO chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>"$LOG" 2>&1							# update the ownership of all the package contents
 			done
 		done
 
@@ -388,7 +376,7 @@ package() {
 
 	# CREATE EACH PACKAGE
 
-	if [ ! "$SKIP" ] || ( [ "$SKIP" ] && [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then		# if '-F' wasn't passed -OR- it was -and- we are on the last pass, then exit this function
+	if [ ! "$SKIP" ] || ( [ "$SKIP" ] && [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# if '-F' wasn't passed -OR- it was -and- we are on the last pass, then exit this function
 		return 0
 	fi
 
@@ -408,19 +396,19 @@ package() {
 	}
 
 	# store the package names that need to be processed (either NAME or directory names)	  NOTE: this has to be performed again incase additional directories were added/removed via a 'pre.package' script
-	[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"					# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
-	[ ! "$DIRS" ] && [ "$TRIM" ] && {						# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
+	[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"						# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
+	[ ! "$DIRS" ] && [ "$TRIM" ] && {							# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
 		NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
 		eval $SUDO mv "$NAME" "$NAMES" 2>>"$LOG"
 	}
-	[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' | sort -u)"	# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+	[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' | sort -u)"		# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 												# NOTE: list all contents | non-greedy sed to remove extension (e.g. .bin) | sort to remove duplicates
 	echo -e "\nCreating the various packages..." | tee -a "$LOG"
-	for DIR in $NAMES; do								# NOTE: the DIR variable will contain directory names, or the actual names of the packages - depending on configuration
+	for DIR in $NAMES; do									# NOTE: the DIR variable will contain directory names, or the actual names of the packages - depending on configuration
 		for PACK in $TEMP; do
-			[ ! -d "${DIR}.${PACK}" ] && continue				# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
+			[ ! -d "${DIR}.${PACK}" ] && continue					# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
 
-			eval TMP_DEPS="$EXT_DEPS"					# update these values if variables were included in their name
+			eval TMP_DEPS="$EXT_DEPS"						# update these values if variables were included in their name
 			eval TMP_HASH="$EXT_HASH"
 			eval TMP_INFO="$EXT_INFO"
 			eval TMP_LIST="$EXT_LIST"
@@ -431,11 +419,11 @@ package() {
 			[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $DIR $PACK, ${DIR}${TMP_SOFT}"
 			[ $DEBUG -gt 0 ] && echo "   DEBUG (URL Info): $URL_TEMP"
 
-			[ "$(ls -1 "${DIR}.${PACK}" | head -1)" = '' ] && continue	# if there are no contents for the iterated package, then no reason to execute the below segment
+			[ "$(ls -1 "${DIR}.${PACK}" | head -1)" = '' ] && continue		# if there are no contents for the iterated package, then no reason to execute the below segment
 			echo "   ${DIR} [${PACK}]"
 			echo -e "\n\n   ----- ${DIR} ${PACK} -----\n\n" >>"$LOG"
-			eval $SPM_MAKE							# NOTE: we use a variable so any package manager can create a native package for their distro
-			case "$PACK" in											# create the dependency list
+			eval $SPM_MAKE								# NOTE: we use a variable so any package manager can create a native package for their distro
+			case "$PACK" in								# create the dependency list
 				'all') [ "$DEP_EXEC_ALL" ] && echo -e "$DEP_EXEC_ALL" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
 				'bin') [ "$DEP_EXEC_BIN" ] && echo -e "$DEP_EXEC_BIN" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
 				'dev') [ "$DEP_EXEC_DEV" ] && echo -e "$DEP_EXEC_DEV" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
@@ -446,18 +434,18 @@ package() {
 				'loc') [ "$DEP_EXEC_LOC" ] && echo -e "$DEP_EXEC_LOC" | tr ' ' '\n' >"${DIR_REPO}/${DIR}${TMP_DEPS}" ;;
 			esac
 			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
-			[ "$URL_INFO" ] && {
+			[ "$URL_INFO" ] && {							# download the existing information file
 				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
-				eval wget "$URL_TEMP" -O "${DIR_REPO}/${DIR}${TMP_INFO}" 2>/dev/null			# download the existing information file
+				eval wget "$URL_TEMP" -O "${DIR_REPO}/${DIR}${TMP_INFO}" 2>/dev/null
 			}
 
-			mv "${DIR}${TMP_SOFT}" "${DIR}${TMP_LIST}" "${DIR}${TMP_HASH}" "$DIR_REPO"			# copy the files into the repo
-			echo "   Your package is now available in: ${DIR_REPO}"
+			mv "${DIR}${TMP_SOFT}" "${DIR}${TMP_LIST}" "${DIR}${TMP_HASH}" "$DIR_REPO"
+			echo "   Your package is now available in: ${DIR_REPO}"			# copy the files into the repo
 		done
 	done
 	eval $SUDO chown -hR ${USER} * >>"$LOG" 2>&1						# update the ownership of all the package contents to be the current user so we can delete it
 
-	[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.package" ] && {				# execute any existing final script (for single-pass; multi-pass is next line)
+	[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.package" ] && {					# execute any existing final script (for single-pass; multi-pass is next line)
 		echo -e "\nExecuting the 'post.package' script..." | tee -a "$LOG"
 		"${DIR_PROF}/post.package" 2>>"$LOG" || stop failed
 	}
@@ -524,8 +512,6 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	-b	build a distributable package"
 	echo "	-c	compile the software only, no packaging"				# this is so that end users can simply download source code and build locally without having to package anything
 	echo "	-d	download the builder profile (uses URL_REPO)"
-# UPDATED 2026/02/12
-#	echo "	-e	create a package .info file template"
 	echo "	-i	install the builder profile"						# installs the builder profile in /etc/builder so it can be used
 	echo "	-p	create a builder profile"
 	echo "	-r	only re-package software instead of building"				# this will be useful if something in 'DIR_PROF/include' gets updated (e.g. added a .desktop file); this can also sort a single package into multiple (e.g. bin, doc, lib, etc)
@@ -646,9 +632,7 @@ else
 		fi
 
 		case ${OPTION} in
-# UPDATED 2026/02/12
-#			A) ARCH="$OPTARG" ;;
-			A) ( echo "${OPTARG}" | grep -qE ^"($(echo ${CPU} | sed 's/,/|/g'))"$ ) || {
+			A) ( echo "${OPTARG}" | grep -qE ^"($(echo "${CPU}" | sed 's/,/|/g'))"$ ) || {
 				echo "ERROR: An invalid value for '-A' was passed."
 				exit 1
 			   }
@@ -662,8 +646,6 @@ else
 			   WGET="$OPTARG" ;;
 			d) DOWNLOAD='TRUE' ;;
 			D) DIRS='TRUE' ;;
-# UPDATED 2026/02/12
-#			e) EXAMPLE=TRUE ;;
 			F) SKIP='TRUE' ;;
 			i) INSTALL='TRUE' ;;
 			I) INFOFILE='TRUE' ;;
@@ -673,8 +655,6 @@ else
 			r) REPACK='TRUE' ;;
 			R) TRIM="$OPTARG" ;;
 			S) SINGLE='TRUE' ;;
-# UPDATED 2026/02/12
-#			t) TEMPLATE='TRUE' ;;
 			t) if ( ! echo "${OPTARG}" | grep -qE ^'(info|profile)'$ ); then
 				echo "ERROR: An invalid value for '-t' was passed."
 				exit 1
@@ -691,10 +671,10 @@ else
 
 	# TEST FOR MANDATORY VALUE(S)
 
-	EXE_CMD="${0##*/} $@"									# store the executed command for logging below
+	EXE_CMD="${0##*/} $@"					# store the executed command for logging below
 	shift $(expr $OPTIND - 1)				# now that the ACTIONS and OPTIONS have been processed, lets process the package name(s)
 	eval NAME=\${$#}					# store the current last passed value to later check if a directory was passed as the last value	http://stackoverflow.com/questions/1853946/getting-the-last-argument-passed-to-a-shell-script
-	( [ "$NAME" = '' ] || [ "$NAME" = "$0" ] ) && { echo "ERROR: you must provide a name before processing can begin."; exit 1; }	# if a blank value was given -OR- no value given at all (since the 'shift' command will go back to $0)
+	( [ "$NAME" = '' ] || [ "$NAME" = "$0" ] ) && { echo "ERROR: you must provide a name before processing can begin."; exit 1; }		# if a blank value was given -OR- no value given at all (since the 'shift' command will go back to $0)
 fi
 
 
@@ -702,13 +682,11 @@ fi
 
 # MANDATORY CHECKS BEFORE **ANY** PROCESSING
 
-# action checking			NOTE: we can't write to a log yet since those checks haven't occurred
+# action checking						  NOTE: we can't write to a log yet since those checks haven't occurred
 TEMP=0
 [ "$BUILD" ] && TEMP=$(( TEMP + 1 ))
 [ "$COMPILE" ] && TEMP=$(( TEMP + 1 ))
 [ "$DOWNLOAD" ] && TEMP=$(( TEMP + 1 ))
-# UPDATED 2026/02/12
-#[ "$EXAMPLE" ] && TEMP=$(( TEMP + 1 ))
 [ "$INSTALL" ] && TEMP=$(( TEMP + 1 ))
 [ "$REPACK" ] && TEMP=$(( TEMP + 1 ))
 [ "$TEMPLATE" ] && TEMP=$(( TEMP + 1 ))
@@ -735,20 +713,14 @@ if [ "$WGET" != '' ]; then
 	}
 fi
 
-# set default/uninitialized variable values							  NOTE: we have to set these here since they rely on functions above
+# set default/uninitialized variable values			  NOTE: we have to set these here since they rely on functions above
 eval LOG="$LOG"
 
 eval DIR_DUMP="$DIR_DUMP"
-# REMOVED 2026/02/12
-#eval DIR_INCL="$DIR_INCL"
 eval DIR_INST="$DIR_INST"
 eval DIR_PROF="$DIR_PROF"
-# REMOVED 2026/02/12
-#eval DIR_MODS="$DIR_MODS"
 eval DIR_REPO="$DIR_REPO"
 eval DIR_TEMP="$DIR_TEMP"
-# REMOVED 2026/02/12
-#eval DIR_XTRA="$DIR_XTRA"
 
 eval URL_CODE="$URL_CODE"
 eval URL_INFO="$URL_INFO"
@@ -761,7 +733,7 @@ eval URL_INFO="$URL_INFO"
 [ "$ARCH" = 'r64' ] && EXPORTS="$FLAG_R64"
 
 
-# check the directories		NOTE: we can't write to a log yet since those checks are occurring
+# check the directories						  NOTE: we can't write to a log yet since those checks are occurring
 if [ ! -d "${DIR_DUMP}/${NAME}" ]; then
 	mkdir -p "${DIR_DUMP}/${NAME}" >/dev/null 2>&1 || { echo "ERROR: The staging location directory (DIR_DUMP) does not exist and could not be created."; exit 1; }
 fi
@@ -819,51 +791,47 @@ if [ "$DOWNLOAD" ]; then
 elif [ "$INSTALL" ]; then
 	echo -e "\nInstalling the requested builder profile..." | tee -a "$LOG"
 
-# DEBUG
-#DIR_PROF='/tmp/zebra/test/ing'
 	[ ! -e "$NAME" ] && {
 		echo "ERROR: No filename exists with that value. If a prior attempt failed, then the"
 		echo "       filename has probably changed."
 		exit 1
 	}
 
-	TEMP='_'									# store a bogus name in case the following 'if' is by-passed (to prevent a bug in the next 'if' block)
-	if [ "$(file -b --mime-type "$NAME")" = 'application/x-gzip' ]; then		# if the profile hasn't been checked that it isn't already installed, then...
+	TEMP='_'										# store a bogus name in case the following 'if' is by-passed (to prevent a bug in the next 'if' block)
+	if [ "$(file -b --mime-type "$NAME")" = 'application/x-gzip' ]; then			# if the profile hasn't been checked that it isn't already installed, then...
 		echo "Calling: mv \"$NAME\" \"${NAME}.tgz\"" >>"$LOG"
-		mv "$NAME" "${NAME}.tgz"						# NOTE: we have to do this step because gunzip will complain about the file extension being unknown (since it changes a tgz|tar.gz to tar)
+		mv "$NAME" "${NAME}.tgz"							# NOTE: we have to do this step because gunzip will complain about the file extension being unknown (since it changes a tgz|tar.gz to tar)
 
 		echo "Calling: gunzip \"${NAME}.tgz\"" >>"$LOG"
-		gunzip "${NAME}.tgz" 2>>"$LOG" || {					#   decompress it
+		gunzip "${NAME}.tgz" 2>>"$LOG" || {						#   decompress it
 			echo "ERROR: The builder profile could not be decompressed." >>"$LOG"
 			stop failed
 		}
-# REMOVED 2026/02/12
-#		NAME="$(echo "$NAME" | sed 's/\.tgz$//').tar"
 
 		echo "Calling: mv \"${NAME}.tar\" \"$NAME\"" >>"$LOG"
-		mv "${NAME}.tar" "$NAME"						# now we return to the original file extention
+		mv "${NAME}.tar" "$NAME"							# now we return to the original file extention
 
 		echo "Calling: tar -tf \"$NAME\" | head -1" >>"$LOG"
-		TEMP="$(tar -tf "$NAME" 2>>"$LOG" | head -1)"				#   store its parent directory name
+		TEMP="$(tar -tf "$NAME" 2>>"$LOG" | head -1)"					#   store its parent directory name
 		[ "$TEMP" = '' ] && {
 			echo "ERROR: The builder profile could not be read." >>"$LOG"
 			stop failed
 		}
 	fi
 
-	[ -e "${DIR_PROF}/${TEMP}" ] && {						# check that that name does NOT already exist in the profile listings
+	[ -e "${DIR_PROF}/${TEMP}" ] && {							# check that that name does NOT already exist in the profile listings
 		echo "ERROR: A profile with that name already exists. Either rename or delete it."
 		echo "       The existing profile is: ${DIR_PROF}/${TEMP}"
 		exit 1
 	}
 
-	if [ "$(file -b --mime-type "$NAME")" = 'application/x-tar' ]; then		# if the profile has been checked and does not exist, then...
+	if [ "$(file -b --mime-type "$NAME")" = 'application/x-tar' ]; then			# if the profile has been checked and does not exist, then...
 		echo "Calling: tar -xf \"$NAME\"\ -C \"$DIR_PROF\"" >>"$LOG"
 		tar -xf "$NAME" -C "$DIR_PROF" 2>>"$LOG" || {
 			echo "ERROR: The builder profile could not be installed." >>"$LOG"
 			stop failed
 		}
-	else										# NOTE: this is a safety-net in case something is wrong with the file
+	else											# NOTE: this is a safety-net in case something is wrong with the file
 		echo "ERROR: The builder profile appears to be the wrong format." >>"$LOG"
 		exit 1
 	fi
@@ -892,8 +860,6 @@ elif [ "$REPACK" ]; then
 	exit 0
 
 
-# UPDATED 2026/02/12
-#elif [ "$EXAMPLE" ]; then
 elif [ "$TEMPLATE" = 'info' ]; then
 	echo -e "\nCreating a package .info file template..." | tee -a "$LOG"
 	echo "name:		${NAME}" >"${DIR_TEMP}/${NAME}.info"
@@ -902,7 +868,7 @@ elif [ "$TEMPLATE" = 'info' ]; then
 	echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
 	echo "released:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
 	echo "packaged:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
-	echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"
+	echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"						# ERASE THE BELOW: THEY'RE JUST DOC NOTES
 	echo "homepage:	https://www.company.com" >>"${DIR_TEMP}/${NAME}.info"					# 	NOTE: these are all appended to main URL (homepage, git, repo)
 	echo "download:	path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"					# oem direct download link from their website
 	echo "git:		https://distributor.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"		# oem git url
@@ -934,8 +900,6 @@ elif [ "$TEMPLATE" = 'info' ]; then
 	exit 0
 
 
-# UPDATED 2026/02/12
-#elif [ "$TEMPLATE" ]; then
 elif [ "$TEMPLATE" = 'profile' ]; then
 	echo -e "\nCreating a builder profile template..." | tee -a "$LOG"
 
@@ -1085,8 +1049,6 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "# If the compile type is 'custom', you need to specify all commands here" >>config
 	echo "# For example: gcc -O whatever" >>config
 	echo "# NOTE: if this contains variables, still surround them in single quotes!!!" >>config
-# UPDATED 2026/02/12
-#	echo "COMPILE=''" >>config
 	echo "CUSTOM=''" >>config
 	echo >>config
 	echo "# Uncomment any of the directory installation locations you wish to modify" >>config
@@ -1168,9 +1130,9 @@ fi
 # BEGIN THE BUILD/COMPILE PROCESS
 
 # for optional values not configured above
-if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then		# if the default (which is all) or a specified 'all' was passed, then...
+if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then			# if the default (which is all) or a specified 'all' was passed, then...
 	# cycle each defined CPU architecture and compile
-	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do	# call this script again for all supported CPU architecture and exit
+	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do		# call this script again for all supported CPU architecture and exit
 		TEMP='"$THIS" -A "$ARCH" -T "$TYPE"'
 		[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 		[ "$DIRS" ] && TEMP="$TEMP -D"
@@ -1186,45 +1148,6 @@ if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then		# if the default (which is all) o
 	exit 0
 fi
 [ ! "$TYPE" ] && TYPE='default'
-
-# MOVED 2026/02/12
-## update directory locations to process any included variables in them
-#eval DIR_DUMP="$DIR_DUMP"
-#eval DIR_INCL="$DIR_INCL"
-#eval DIR_INST="$DIR_INST"
-#eval DIR_MAKE="$DIR_MAKE"
-#eval DIR_MODS="$DIR_MODS"
-#eval DIR_REPO="$DIR_REPO"
-#eval DIR_TEMP="$DIR_TEMP"
-#eval DIR_XTRA="$DIR_XTRA"
-#
-## update URL locations to process any included variables in them
-#eval URL_CODE="$URL_CODE"
-#eval URL_INFO="$URL_INFO"
-
-# REMOVED 2026/02/11 - this is already performed at the top of the script
-#	# if a parameters file is present, read in its values
-#	[ -e "${DIR_MAKE}/params" ] && . "${DIR_MAKE}/params"										# Global package parameters	NOTE: these can completely specify or compliment passed switches (which override these)
-#	[ -e "/usr/local/${DIR_MAKE}/params" ] && . "/usr/local/${DIR_MAKE}/params"							# ditto as alternate location
-#	[ -e "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/params" ] && . "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/params"		# ditto as personalized params file - using XSB
-#	[ -e "${HOME}/.${DIR_MAKE##*/}/params" ] && . "${HOME}/.${DIR_MAKE##*/}/params"							# ditto as personalized params file - using LSB
-#
-#	OPTIND=1						# reset the global variable used by 'getopts' so it can start over	https://unix.stackexchange.com/questions/233728/bash-function-with-getopts-only-works-the-first-time-its-run
-#	while getopts A:C:cDFN:PR:ST:U OPTION; do		# NOTE: we have to process the passed switches again so they take precedence over the 'params' file above
-#		case ${OPTION} in
-#			A) ARCH="$OPTARG" ;;
-#			C) WGET="$OPTARG" ;;
-#			c) COMPILE=TRUE ;;
-#			D) DIRS=TRUE ;;
-#			F) SKIP=TRUE ;;
-#			N) PASS="$OPTARG" ;;
-#			P) PATCH='' ;;
-#			R) TRIM="$OPTARG" ;;
-#			S) SINGLE=TRUE ;;
-#			T) TYPE="$OPTARG" ;;
-#			U) UNLOAD='' ;;
-#		esac
-#	done
 
 
 
@@ -1262,21 +1185,6 @@ fi
 
 
 
-# MOVED 2026/02/11 - moved at the top
-## LOAD PROJECT CONFIGURATION
-#
-#[ ! "$PASS" ] && [ -e "${DIR_MAKE}/config" ] && . "${DIR_MAKE}/config"									# Global package parameters	pickup any specific variables for the target package (if not doing a multi-pass)
-#[ ! "$PASS" ] && [ -e "/usr/local/${DIR_MAKE}/config" ] && . "/usr/local/${DIR_MAKE}/config"						# ditto as alternate location
-#[ ! "$PASS" ] && [ -e "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/config" ] && . "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/config"	# ditto as personalized config file - using XSB
-#[ ! "$PASS" ] && [ -e "${HOME}/.${DIR_MAKE##*/}/config" ] && . "${HOME}/.${DIR_MAKE##*/}/config"					# ditto as personalized config file - using LSB
-#[ "$PASS" ] && [ -e "${DIR_MAKE}/config.${PASS}" ] && . "${DIR_MAKE}/config.${PASS}"							# if we are on a multi-pass and a config exists for that pass, then read it in!
-#[ "$PASS" ] && [ -e "/usr/local/${DIR_MAKE}/config.${PASS}" ] && . "/usr/local/${DIR_MAKE}/config.${PASS}"
-#[ "$PASS" ] && [ -e "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/config.${PASS}" ] && . "${HOME}/.$(echo "${DIR_MAKE}" | tail -c +2)/config.${PASS}"
-#[ "$PASS" ] && [ -e "${HOME}/.${DIR_MAKE##*/}/config.${PASS}" ] && . "${HOME}/.${DIR_MAKE##*/}/config.${PASS}"
-
-
-
-
 # OPTIONALLY SHOW DEBUG OUTPUT
 
 [ $DEBUG -gt 0 ] && {
@@ -1284,8 +1192,6 @@ fi
 	echo "   ARCH: $ARCH" | tee -a "$LOG"
 	echo "   DIRS: $DIRS" | tee -a "$LOG"
 	echo "   NAME: $NAME" | tee -a "$LOG"
-# REMOVED 2026/02/12
-#	echo "   NOPK: $NOPK" | tee -a "$LOG"
 	echo "   PASS: $PASS" | tee -a "$LOG"
 	echo "   SKIP: $SKIP" | tee -a "$LOG"
 	echo "   TRIM: $TRIM" | tee -a "$LOG"
@@ -1305,16 +1211,10 @@ fi
 	echo "   FLAG_MAKE: $FLAG_MAKE" | tee -a "$LOG"
 	echo | tee -a "$LOG"
 	echo "   DIR_DUMP: $DIR_DUMP" | tee -a "$LOG"
-# REMOVED 2026/02/12
-#	echo "   DIR_INCL: $DIR_INCL" | tee -a "$LOG"
 	echo "   DIR_INST: $DIR_INST" | tee -a "$LOG"
 	echo "   DIR_PROF: $DIR_PROF" | tee -a "$LOG"
-# REMOVED 2026/02/12
-#	echo "   DIR_MODS: $DIR_MODS" | tee -a "$LOG"
 	echo "   DIR_REPO: $DIR_REPO" | tee -a "$LOG"
 	echo "   DIR_TEMP: $DIR_TEMP" | tee -a "$LOG"
-# REMOVED 2026/02/12
-#	echo "   DIR_XTRA: $DIR_XTRA" | tee -a "$LOG"
 	echo | tee -a "$LOG"
 	echo "   URL_CODE: $URL_CODE" | tee -a "$LOG"
 	echo "   URL_REPO: $URL_REPO" | tee -a "$LOG"
@@ -1332,7 +1232,7 @@ fi
 echo -e "\nInstalling compile-time dependencies..." | tee -a "$LOG"
 
 # for core software by builder itself
-[ "$DEP_MAKE_ALL" ] && ( [ ! "$PASS" ] || [ $PASS -eq 1 ] ) && { eval $SPM_ALL 2>>"$LOG" || stop clean; }			# if we are only doing a single pass -OR- are on the first pass, then...
+[ "$DEP_MAKE_ALL" ] && ( [ ! "$PASS" ] || [ $PASS -eq 1 ] ) && { eval $SPM_ALL 2>>"$LOG" || stop clean; }					# if we are only doing a single pass -OR- are on the first pass, then...
 
 # for the software project itself
 [ "$DEP_MAKE_PAK" ] && { eval $SPM_PACK 2>>"$LOG" || stop clean; }
@@ -1365,7 +1265,7 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 			TEMP="${URL_INFO##*/}"							#   store the filename that was just downloaded
 		fi
 		if [ ! -e "$(grep -e ^'package:' "${TEMP}" | sed 's/.*:\t//')" ]; then
-			TEMP="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"	# grep out the meaningful lines and combine to produce a valid download URL
+			TEMP="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"		# grep out the meaningful lines and combine to produce a valid download URL
 			echo "Calling: wget \"$TEMP\"" >>"$LOG"
 			wget "$TEMP" 2>>"$LOG" || stop failed
 		fi
@@ -1549,9 +1449,7 @@ fi
 echo -e "\nGenerating the compile script..." | tee -a "$LOG"
 echo "#!/bin/sh" >"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 echo >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
-# UPDATED 2026/02/12
-#echo 'unset DIR_CONF DIR_DUMP DIR_INCL DIR_INST DIR_PROF DIR_MODS DIR_REPO DIR_TEMP DIR_XTRA' >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"		# unset these variables set at the top of this script to not pollute the compile environment
-echo 'unset DIR_CONF DIR_DUMP DIR_INST DIR_PROF DIR_REPO DIR_TEMP' >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"		# unset these variables set at the top of this script to not pollute the compile environment
+echo 'unset DIR_CONF DIR_DUMP DIR_INST DIR_PROF DIR_REPO DIR_TEMP' >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"						# unset these variables set at the top of this script to not pollute the compile environment
 echo 'unset DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS' >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 echo 'unset DEP_MAKE_ALL' >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 echo 'unset EXT_BLDR EXT_CODE EXT_DEPS EXT_HASH EXT_INFO EXT_LIST EXT_MAKE EXT_SOFT' >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
@@ -1609,8 +1507,6 @@ elif [ "$TYPE" = 'cmake' ]; then
 	echo "cd build_me >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	echo "cmake $FLAG_CONF .. >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 elif [ "$TYPE" = 'custom' ]; then
-# UPDATED 2026/02/12
-#	echo "$COMPILE >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	echo "$CUSTOM >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 elif [ "$TYPE" = 'default' ]; then
 	[ $CONF -eq 1 ] && { echo "./configure$TEMP $FLAG_CONF >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"; }
@@ -1618,7 +1514,7 @@ elif [ "$TYPE" = 'scons' ]; then
 	echo "scons $FLAG_CONF >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 fi
 
-[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.configure" ] && {	# execute any existing post-configure script (for single-pass; multi-pass is next block)
+[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.configure" ] && {											# execute any existing post-configure script (for single-pass; multi-pass is next block)
 	echo "echo -e \"   Executing the 'post.configure' script...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	echo "${DIR_PROF}/post.configure >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	echo "echo -e \"   Proceeding with next steps of compile...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
@@ -1630,10 +1526,10 @@ fi
 }
 
 if [ "$TYPE" != 'scons' ]; then
-	echo "make $FLAG_MAKE >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"		# NOTE: 'nice' should help prevent non-responding system crashes, and '-j' indicates to use all cores of a CPU during compiling
+	echo "make $FLAG_MAKE >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"							# NOTE: 'nice' should help prevent non-responding system crashes, and '-j' indicates to use all cores of a CPU during compiling
 	[ $CHECK -eq 1 ] && echo "make check >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	[ $TEST -eq 1 ] && echo "make test >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
-	echo "make install $FLAG_INST >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"	# install the newly compiled software in the temp packaging directory
+	echo "make install $FLAG_INST >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"						# install the newly compiled software in the temp packaging directory
 elif [ "$TYPE" = 'scons' ]; then
 	echo "scons install $FLAG_INST >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 fi
@@ -1651,7 +1547,7 @@ for DIR in DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SC
 	[ ! "$PASS" ] && cp -dpR "${DIR_PROF}/include/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
 done
 
-[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.compile" ] && {						# execute any existing post-compile script (for single-pass; multi-pass is next line)
+[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.compile" ] && {												# execute any existing post-compile script (for single-pass; multi-pass is next line)
 	echo -e "\nExecuting the 'post.compile' script..." | tee -a "$LOG"
 	"${DIR_PROF}/post.compile" 2>>"$LOG" || stop failed
 }
@@ -1671,10 +1567,10 @@ done
 
 # OPTIONALLY PACKAGE or INSTALL SOFTWARE
 
-if [ ! "$COMPILE" ]; then										# if we are packaging, then call those routines
+if [ ! "$COMPILE" ]; then									# if we are packaging, then call those routines
 	package
 
-elif [ "$COMPILE" ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then			# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
+elif [ "$COMPILE" ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
 	echo -e "\nInstalling the compiled software..." | tee -a "$LOG"
 
 	echo "Calling: cd \"$DIR_DUMP\"" >>"$LOG"

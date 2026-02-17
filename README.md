@@ -36,7 +36,7 @@
 	work best for you and your project.
 
 	While builder does not make any stage of development easier for you, its
-	main design goal is to make is VERY easy for an end user to compile your
+	main design goal is to make it VERY easy for an end user to compile your
 	software, or aid in the rapid distribution of your project to qualified
 	package maintainers of the various Linux distros. By constructing a
 	(generic) builder profile for your work, you are helping to streamline

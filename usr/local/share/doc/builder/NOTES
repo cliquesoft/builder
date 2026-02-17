@@ -30,7 +30,7 @@ Building with builder
 	To perform the same steps, but to additionally package the software for
 	a distro, don't pass the '-c':
 
-	builder -C repo ifplugd
+	builder -b -C repo ifplugd
 
 	Using any of the above methods, your present directory is irrelevent.
 	However, if you downloaded the source code manually, you need to be
@@ -97,7 +97,7 @@ Example directory structure
 	/var/cache/builder/ foo/post.package[.1,.2,...]		# same as above, but run post-package								NOTE: this is run while in the DIR_DUMP directory
 	/var/cache/builder/ foo/proper[.1,.2,...]		# a flag (empty file) that indicates cleanup should occur automatically without prompt for each compiled package
 	/var/cache/builder/ foo/extras/ usr/local/tce.installed/foo	# stores any files that are not part of 'include' (e.g. httpd.conf for php compile); useful when DIRS=TRUE
-	/var/cache/builder/ foo/include[.1,.2,...]/ [VAR]/foo.conf	# contains things like .desktop files, icons, install markers/scripts, service scripts, etc	NOTE: you can put things under directories like 'DIR_BIN/foo' to get copied into the directory tree associated with the DIR_BIN value (e.g. DIR_BIN='${DIR_INST}/bin' > /usr/local/bin/foo)
+	/var/cache/builder/ foo/include[.1,.2,...]/ [VAR]/foo.conf	# contains things like .desktop files, icons, install and service markers/scripts, etc	NOTE: you can put things under directories like 'DIR_BIN/foo' to get copied into the directory tree associated with the DIR_BIN value (e.g. DIR_BIN='${DIR_INST}/bin' > /usr/local/bin/foo)
 	/var/cache/builder/ foo/patches[.1,.2,...]/ xyz_patch.cpp	# contains any distro specific patches to be applied pre-compile
 	/tmp/builder/						# the temporary location to store any information and files needed by this script
 	/tmp/staging/						# the staging location that stores the compiled software where it gets split and packaged

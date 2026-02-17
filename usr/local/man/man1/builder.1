@@ -53,57 +53,62 @@ OPTIONS:
 5.  OPTIONS
 6.  EXAMPLES
 7.  BUGS
-8.  ACKNOWLEDGEMENTS
-9.  COPYRIGHT
-10. AUTHORS
+8.  COPYRIGHT
+9.  AUTHORS
 
 
 
 
 .SH DESCRIPTION
 .I builder
+was created to not only make it easier to compile software, but to also
+enable a quick way to distribute the means of doing so. Imagine having a
+very small file that contains the dependencies required to compile, the
+places to obtain the source code, any desired patches, and any additional
+files to include in an installation (e.g. desktop files). That file, which
+is known as a "builder profile", can be parsed by builder to automatically
+carry out each of those steps, with an optional final process of creating
+distribution packages - making this suitable for end users and package
+maintainers alike! By simply making the builder profile available, anyone
+can quickly and effortlessly compile any software by issuing a single,
+short command!
 
+[package maintainers]
+It is important to note that this software will not magically determine
+all of the steps outlined above and do it for you. Someone has to actually
+outline this process in an initial builder profile (ideally being the
+software developer). This project is meant to provide an easy way to use
+the contributions of others who have taken those steps, and allow package
+maintainers of each distro to quickly tweak the profile to fit their own
+system. This makes it trivial to modify the compile parameters, add or
+remove patches, add or remove graphics, include GUI desktop files, and
+other items to specifically tailor a software build.
 
-is a lightweight, robust, and versatile package manager for Linux distros.
-While not quite as feature rich as the apt/dpkg Debian system, pax also is
-a fraction of its size (almost a 10th at 200kb)! The development of this
-project will continue so that all commonly used functions will eventually
-be incorporated, along with several that are unique. There are also plans
-to have this package manager work with non-native package formats such as
-.deb and .rpm, allowing users and admins another (standardized) option in
-their network of devices.
+[software developers]
+Builder works with a variety of popular methods of compilation including
+autoconf, autogen, bootstrap, cmake, scons, and a default (configure,
+make, make install). There is even an option to create a custom method if
+you require it. This allows you the freedom to choose which one will work
+best for you and your project.
 
-Currently this project can perform a variety of operations including:
-  o Copying packages (and dependencies) from one location to another
-  o Extracting packages (and dependencies) to a specified location
-  o Downloading packages (and dependencies) to a specified location
-  o Finding local packages that one or more files belong to
-  o (Un)installing packages (and dependencies)
-  o (Un)installing different versions of packages
-  o List installed packages
-  o Make and package software for distribution
-  o Open a fifo for network client operation
-  o Display dependency trees for packages
-  o Validate and repair installed software
-  o Output can be displayed in various formats
-  o Proxy several actions from an offline to an online device
-
-Common outstanding features include:
-  o Ability to search online repos
-  o Automated package checking/downloading/updating
-  o A graphical user interface
-
-Unique outstanding features include:
-  o Ability to process .deb (and other) package types
-  o Expand output to include an 'html' and 'json' option
-  o More proxy actions
-  o A centralized update server
-  o A network server to manipulate packages on clients
+While builder does not make any stage of development easier for you, its
+main design goal is to make it VERY easy for an end user to compile your
+software, or aid in the rapid distribution of your project to qualified
+package maintainers of the various Linux distros. By constructing a
+(generic) builder profile for your work, you are helping to streamline
+the steps necessary for them to tailor your software to their specific
+environment. We would encourage any developer to include this as a zip or
+tarball packaged with their source code, or at least an option to download
+from their website.
 
 
 
 
 .SH CONFIG
+There are several configuration files that are used with builder. The main
+file is used to set global values, but these can be overwritten in other
+configs.  *define the search order, with switches taking precedence*
+
 There are a variety of values that can be modified so that pax can work
 with any Linux distro. This ranges from package storage locations and
 operational directories, to package extensions and schemas. Each value
@@ -865,16 +870,6 @@ There are no known bugs as of January 2026.
 
 Please visit our website for the latest list of opened bug reports for
 this software project - http://www.cliquesoft.org.
-
-
-
-
-.SH ACKNOWLEDGEMENTS
-
-This program is based on the various package managers currently in use
-for the many Linux distros available today. We use them as a guide to
-incorporate new features to expand the project.
-
 
 
 
