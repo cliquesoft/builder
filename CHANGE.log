@@ -103,4 +103,14 @@
 2026/02/17
 - Removed commented out code
 - Aligned comments
+- Started creating the man page
+
+2026/02/18
+- Updated the default directory locations
+- Updated the default compile locations
+- Re-arranged and updated the config.TC file
+- Updated the directory where the 'params' file was located
+- Simplified the installation routine
+- Continued creating the man page
+- Updated the --help output
 

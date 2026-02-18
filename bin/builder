@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/02/12 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/02/18 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -32,24 +32,14 @@
 
 export DEBUG=0							# whether or not to show debug output during processing
 
-export DIR_CONF='/etc/builder'					# the location of the configuration for this script	NOTE: this can't be changed in the 'config' file since we have to use this value to find the file itself!
+export DIR_CONF='/etc/builder'					# the location of the configuration for this script		NOTE: this can't be changed in the 'config' file since we have to use this value to find the file itself!
 export DIR_DUMP='/tmp/staging'					# the staging location that will be the target to dump compiled programs into for making the various packages
 export DIR_INST=''						# the directory where the package contents will reside in the running system; blank=root directory
-export DIR_PROF='/var/cache/builder/${NAME}'			# this will store individual compile parameters for each package
+export DIR_PROF='/var/cache/builder'				# the directory storing all of the builder profiles		NOTE: the NAME value gets appended to this
 export DIR_REPO='/tmp/repo'					# the location that the packaged software will be stored and source code is found (when using '-C dir') - the local software repository
 export DIR_TEMP='/tmp/builder'					# the temporary location to store any information and files needed by this script
 
-export DIR_BIN="${DIR_INST}/bin"				# directory locations used with 'DIR_INST' (equilent to PREFIX when 'configuring')
-export DIR_ETC="${DIR_INST}/etc"
-export DIR_LIB="${DIR_INST}/lib"
-export DIR_SBIN="${DIR_INST}/sbin"
-export DIR_SHARE="${DIR_INST}/share"
-export DIR_VAR="/var"
-export DIR_MARKERS="${DIR_INST}/tce.installed"
-export DIR_SCRIPTS="${DIR_INST}/etc/init.d"
-
 export DEP_MAKE_ALL='compiletc squashfs_tools rsync find_utils'	# compile-time deps list for all projects (e.g. compiletc, mksquashfs-tools, ...)
-export DEP_MAKE_PAK=''						# compile-time deps list for the current project
 
 export EXT_BLDR='.${PACK}.all.bldr'				# [tgz file] package builder profile
 export EXT_CODE='.${PACK}.all.code'				# [tgz file] package source code
@@ -67,8 +57,6 @@ export PRM_DIRS='775'						# the permissions to apply to directories of the pack
 export PRM_FILES='664'						# the permissions to apply to all files of the package
 export PRM_EXECS='755'						# the permissions to apply to all executables in /bin, /sbin, etc and also the libraries
 
-export GIT_REPO=''						# the online git repo that can be cloned (set in a package config file)
-export URL_CODE=''						# the developer URL used to obtain the package source code (set in a package config file)
 export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_INFO}'		# the .info file URL used to obtain the package source code (set in builder config file)
 export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_CODE}'		# the distro repo URL used to obtain the package source code (set in builder config file)
 
@@ -123,7 +111,6 @@ CPU='a32,a64,i32,i64,r32,r64'					# the CPU architectures that you wish to compi
 CWDL="$(pwd)"							# stores the current working directory location
 EXPORTS=''							# the exported compile flags based on the desired CPU architecture
 export PACK=''							# the type of package being made (e.g. bin, dev, doc, ...)
-SORT=''								# indicates we need to sort the package contents on this pass
 TEMP=''								# stores a temporary value
 
 # [names]
@@ -151,49 +138,62 @@ WGET=''								# indicates that we need to download the source code file; valid 
 UNLOAD=''							# indicates we need to unload the packages afterwards - regardless of success or failure
 
 # [config]
-CHECK=0								# indicates that the 'make check' step is requested to be made during compile
-CLEAN=0								# indicates that the 'make clean' step is necessary (mostly for multi-run compiles)		NOTE: passing a '2' value performs a distclean
-CONF=1								# indicates that the 'configure' step needs to be made during compile
-PROP=0								# indicates that the 'make mrproper' step is necessary (mostly for multi-run compiles)
-TEST=0								# indicates that the 'make test' step is requested to be made during compile
-CODE=''								# when compiling multiple softwares with a single builder profile (e.g. alsa-lib, alsa-utils), this value uniquely identifies the package per pass (e.g. config.1 > CODE='alsa-lib'; config.2 > CODE='alsa-utils')
+export CHECK=0							# indicates that the 'make check' step is requested to be made during compile
+export CLEAN=0							# indicates that the 'make clean' step is necessary (mostly for multi-run compiles)		NOTE: passing a '2' value performs a distclean
+export CONF=1							# indicates that the 'configure' step needs to be made during compile
+export PROP=0							# indicates that the 'make mrproper' step is necessary (mostly for multi-run compiles)
+export TEST=0							# indicates that the 'make test' step is requested to be made during compile
+export SORT=''							# indicates we need to sort the package contents on this pass
+export CODE=''							# when compiling multiple softwares with a single builder profile (e.g. alsa-lib, alsa-utils), this value uniquely identifies the package per pass (e.g. config.1 > CODE='alsa-lib'; config.2 > CODE='alsa-utils')
 
-CUSTOM=''							# used when TYPE='custom'
+export GIT_REPO=''						# the online git repo that can be cloned (set in a package config file)
+export URL_CODE=''						# the developer URL used to obtain the package source code (set in a package config file)
 
-CFG_BIN=""							# DIR_INST/bin	directory locations used with 'configure'
-CFG_DATA=""							# DIR_INST/usr/share
-CFG_DATAROOT=""							# CFG_DATA
-CFG_DOC=""							# CFG_DATA/doc/NAME
-CFG_DVI=""							# CFG_DOC
-CFG_HTML=""							# CFG_DOC
-CFG_INCLUDE=""							# DIR_INST/usr/local/include
-CFG_INFO=""							# CFG_DATA/info
-CFG_LIB=""							# DIR_INST/lib
-CFG_LIBEXEC=""							# DIR_INST/libexec
-CFG_LOCALE=""							# CFG_DATA/locale
-CFG_LOCALSTATE=""						# DIR_INST/var
-CFG_MAN=""							# CFG_DATA/man
-CFG_OLDINCLUDE=""						# /usr/include
-CFG_PDF=""							# CFG_DOC
-CFG_PS=""							# CFG_DOC
-CFG_SBIN=""							# DIR_INST/sbin
-CFG_SHAREDSTATE=""						# DIR_INST/com
-CFG_SYSCONFIG=""						# DIR_INST/etc
-CFG_MISC=""							# a standardized extra variable that can be used per project (e.g. mplayer codecs)	NOTE: this one will need to include the switch as well (e.g. '--codec-dir=...')
+export CUSTOM=''						# used when TYPE='custom'
 
-DEP_EXEC_ALL=''
-DEP_EXEC_BIN=''							# run-time deps list for each package type
-DEP_EXEC_DEV=''
-DEP_EXEC_DOC=''
-DEP_EXEC_DRV=''
-DEP_EXEC_GIR=''
-DEP_EXEC_LIB=''
-DEP_EXEC_LOC=''
-DEP_MAKE_PAK=''							# compile-time deps list for a specific project
+export DIR_BIN="${DIR_INST}/bin"				# software installation directory locations
+export DIR_ETC="${DIR_INST}/etc"
+export DIR_LIB="${DIR_INST}/lib"
+export DIR_SBIN="${DIR_INST}/bin"
+export DIR_SHARE="${DIR_INST}/share"
+export DIR_VAR="${DIR_INST}/var"
+export DIR_MARKERS="${DIR_INST}/${DIR_VAR}/cache/software"
+export DIR_SCRIPTS="${DIR_INST}/etc/init.d"
 
-FLAG_CONF=''							# the flags to pass to the 'configure' script or 'cmake'
-FLAG_INST=''							# the flags to pass to the 'make install' call
-FLAG_MAKE=''							# the flags to pass to the 'make' call
+export CFG_BIN="${DIR_INST}/bin"				# compile 'configure' directory locations
+export CFG_DATA="${DIR_INST}/var/share"
+export CFG_DATAROOT="${CFG_DATA}"
+export CFG_DOC="${CFG_DATA}/doc/${NAME}"
+export CFG_DVI="${CFG_DOC}"
+export CFG_HTML="${CFG_DOC}"
+export CFG_INCLUDE="${DIR_INST}/lib/include"
+export CFG_INFO="${CFG_DATA}/info"
+export CFG_LIB="${DIR_INST}/lib"
+export CFG_LIBEXEC="${CFG_LIB}"
+export CFG_LOCALE="${CFG_DATA}/locale"
+export CFG_LOCALSTATE="${DIR_INST}/var"
+export CFG_MAN="${CFG_DATA}/man"
+export CFG_OLDINCLUDE="${DIR_INST}/lib/include"
+export CFG_PDF="${CFG_DOC}"
+export CFG_PS="${CFG_DOC}"
+export CFG_SBIN="${DIR_INST}/bin"
+export CFG_SHAREDSTATE="${DIR_INST}/var"
+export CFG_SYSCONFIG="${DIR_INST}/etc"
+export CFG_MISC=""						# a standardized extra variable that can be used per project (e.g. mplayer codecs)	NOTE: this one will need to include the switch as well (e.g. '--codec-dir=...')
+
+export DEP_MAKE_PAK=''						# compile-time deps list for a specific project
+export DEP_EXEC_ALL=''
+export DEP_EXEC_BIN=''						# run-time deps list for each package type
+export DEP_EXEC_DEV=''
+export DEP_EXEC_DOC=''
+export DEP_EXEC_DRV=''
+export DEP_EXEC_GIR=''
+export DEP_EXEC_LIB=''
+export DEP_EXEC_LOC=''
+
+export FLAG_CONF=''						# the flags to pass to the 'configure' script or 'cmake'
+export FLAG_INST=''						# the flags to pass to the 'make install' call
+export FLAG_MAKE=''						# the flags to pass to the 'make' call
 
 
 
@@ -466,34 +466,21 @@ package() {
 
 # LOAD GLOBAL CONFIGURATION
 
-[ -e "${DIR_CONF}/config" ] && . "${DIR_CONF}/config"												# System-wide config, overwriting any default variable values set at the top
-[ -e "/usr/local/${DIR_CONF}/config" ] && . "/usr/local/${DIR_CONF}/config"									# ditto as alternate location
+[ -e "${DIR_CONF}/config" ] && . "${DIR_CONF}/config"						# System-wide config, overwriting any default variable values set at the top
+[ -e "/usr/local/${DIR_CONF}/config" ] && . "/usr/local/${DIR_CONF}/config"			# ditto as alternate location
 [ -e "${HOME}/.$(echo "${DIR_CONF}" | tail -c +2)/config" ] && . "${HOME}/.$(echo "${DIR_CONF}" | tail -c +2)/config"				# ditto as personalized config file - using XSB
-[ -e "${HOME}/.${DIR_CONF##*/}/config" ] && . "${HOME}/.${DIR_CONF##*/}/config"									# ditto as personalized config file - using LSB
+[ -e "${HOME}/.${DIR_CONF##*/}/config" ] && . "${HOME}/.${DIR_CONF##*/}/config"			# ditto as personalized config file - using LSB
 
+# LOAD PROFILE CONFIGURATION
 
-
-
-# LOAD PROJECT CONFIGURATION
-
-[ ! "$PASS" ] && [ -e "${DIR_PROF}/config" ] && . "${DIR_PROF}/config"										# Global package parameters	NOTE: if not doing a multi-pass
-[ ! "$PASS" ] && [ -e "/usr/local/${DIR_PROF}/config" ] && . "/usr/local/${DIR_PROF}/config"							# ditto as alternate location
-[ ! "$PASS" ] && [ -e "${HOME}/.$(echo "${DIR_PROF}" | tail -c +2)/config" ] && . "${HOME}/.$(echo "${DIR_PROF}" | tail -c +2)/config"		# ditto as personalized config file - using XSB
-[ ! "$PASS" ] && [ -e "${HOME}/.${DIR_PROF##*/}/config" ] && . "${HOME}/.${DIR_PROF##*/}/config"						# ditto as personalized config file - using LSB
-[ "$PASS" ] && [ -e "${DIR_PROF}/config.${PASS}" ] && . "${DIR_PROF}/config.${PASS}"								# if we are on a multi-pass and a config exists for that pass, then read it in!
-[ "$PASS" ] && [ -e "/usr/local/${DIR_PROF}/config.${PASS}" ] && . "/usr/local/${DIR_PROF}/config.${PASS}"
-[ "$PASS" ] && [ -e "${HOME}/.$(echo "${DIR_PROF}" | tail -c +2)/config.${PASS}" ] && . "${HOME}/.$(echo "${DIR_PROF}" | tail -c +2)/config.${PASS}"
-[ "$PASS" ] && [ -e "${HOME}/.${DIR_PROF##*/}/config.${PASS}" ] && . "${HOME}/.${DIR_PROF##*/}/config.${PASS}"
-
-
-
+eval NAME=\${$#}										# store the current last passed value (which should be the NAME)
+[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/config" ] && . "${DIR_PROF}/${NAME}/config"		# Profile config
+[ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/config.${PASS}" ] && . "${DIR_PROF}/${NAME}/config.${PASS}"						# ditto, but for multi-pass
 
 # LOAD SWITCH DEFAULTS
 
-[ -e "${DIR_CONF}/params" ] && . "${DIR_CONF}/params"												# System-wide config, overwriting any default variable values set at the top
-[ -e "/usr/local/${DIR_CONF}/params" ] && . "/usr/local/${DIR_CONF}/params"									# ditto as alternate location
-[ -e "${HOME}/.$(echo "${DIR_CONF}" | tail -c +2)/params" ] && . "${HOME}/.$(echo "${DIR_CONF}" | tail -c +2)/params"				# ditto as personalized config file - using XSB
-[ -e "${HOME}/.${DIR_CONF##*/}/params" ] && . "${HOME}/.${DIR_CONF##*/}/params"									# ditto as personalized config file - using LSB
+[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/params" ] && . "${DIR_PROF}/${NAME}/params"		# Profile parameters
+[ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/params.${PASS}" ] && . "${DIR_PROF}/${NAME}/params.${PASS}"						# ditto, but for multi-pass
 
 
 
@@ -506,6 +493,7 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo " configurations to tailor the software specifically for your distro."
 	echo
 	echo "  Usage:"
+# VER2 - add in a DIRECTORY value to specify the location for some values (e.g. where the source code is, where the created packages should be stored, etc)
 	echo "	${THIS##*/} [OPTIONS] ACTION NAME"
 	echo
 	echo "  Actions:"
@@ -547,11 +535,12 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo
 	echo
 	echo "  Build Software Steps:                             [end user/package creator]"
+# VER2 - instead of steps 2 and 4, those can become the DIRECTORY parameter to steps 3 and 5 respectively
 	echo "	1. builder -d NAME (or download the builder profile manually)"
-	echo "	3. cd /location/of/builder/profile"
-	echo "	2. builder -i NAME.${EXT_BLDR}"
-	echo "	3. cd /package/source/code/directory"
-	echo "	4. builder -{bc} NAME"
+	echo "	2. cd /location/of/builder/profile"
+	echo "	3. builder -i NAME.${EXT_BLDR}"
+	echo "	4. cd /package/source/code/directory"
+	echo "	5. builder -{bc} NAME"
 	echo "	   NOTES:"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
 	echo "	   - to create a distributable software package, use the -b switch"
@@ -718,7 +707,7 @@ eval LOG="$LOG"
 
 eval DIR_DUMP="$DIR_DUMP"
 eval DIR_INST="$DIR_INST"
-eval DIR_PROF="$DIR_PROF"
+[ ! "$INSTALL" ] && eval DIR_PROF="${DIR_PROF}/${NAME}"		# if we aren't installing a profile, then append the NAME value to the variable
 eval DIR_REPO="$DIR_REPO"
 eval DIR_TEMP="$DIR_TEMP"
 
@@ -792,40 +781,18 @@ elif [ "$INSTALL" ]; then
 	echo -e "\nInstalling the requested builder profile..." | tee -a "$LOG"
 
 	[ ! -e "$NAME" ] && {
-		echo "ERROR: No filename exists with that value. If a prior attempt failed, then the"
+		echo "ERROR: No file exists with that name. If a prior attempt failed, then the"
 		echo "       filename has probably changed."
 		exit 1
 	}
 
-	TEMP='_'										# store a bogus name in case the following 'if' is by-passed (to prevent a bug in the next 'if' block)
-	if [ "$(file -b --mime-type "$NAME")" = 'application/x-gzip' ]; then			# if the profile hasn't been checked that it isn't already installed, then...
-		echo "Calling: mv \"$NAME\" \"${NAME}.tgz\"" >>"$LOG"
-		mv "$NAME" "${NAME}.tgz"							# NOTE: we have to do this step because gunzip will complain about the file extension being unknown (since it changes a tgz|tar.gz to tar)
-
-		echo "Calling: gunzip \"${NAME}.tgz\"" >>"$LOG"
-		gunzip "${NAME}.tgz" 2>>"$LOG" || {						#   decompress it
-			echo "ERROR: The builder profile could not be decompressed." >>"$LOG"
-			stop failed
-		}
-
-		echo "Calling: mv \"${NAME}.tar\" \"$NAME\"" >>"$LOG"
-		mv "${NAME}.tar" "$NAME"							# now we return to the original file extention
-
-		echo "Calling: tar -tf \"$NAME\" | head -1" >>"$LOG"
-		TEMP="$(tar -tf "$NAME" 2>>"$LOG" | head -1)"					#   store its parent directory name
-		[ "$TEMP" = '' ] && {
-			echo "ERROR: The builder profile could not be read." >>"$LOG"
-			stop failed
-		}
-	fi
-
-	[ -e "${DIR_PROF}/${TEMP}" ] && {							# check that that name does NOT already exist in the profile listings
+	[ -e "${DIR_PROF}/${NAME}" ] && {							# check that that name does NOT already exist in the profile listings
 		echo "ERROR: A profile with that name already exists. Either rename or delete it."
-		echo "       The existing profile is: ${DIR_PROF}/${TEMP}"
+		echo "       The existing profile is: ${DIR_PROF}/${NAME}"
 		exit 1
 	}
 
-	if [ "$(file -b --mime-type "$NAME")" = 'application/x-tar' ]; then			# if the profile has been checked and does not exist, then...
+	if [ "$(file -b --mime-type "$NAME")" = 'application/x-gzip' ]; then			# if the profile has been checked and does not exist, then...
 		echo "Calling: tar -xf \"$NAME\"\ -C \"$DIR_PROF\"" >>"$LOG"
 		tar -xf "$NAME" -C "$DIR_PROF" 2>>"$LOG" || {
 			echo "ERROR: The builder profile could not be installed." >>"$LOG"
@@ -868,7 +835,7 @@ elif [ "$TEMPLATE" = 'info' ]; then
 	echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
 	echo "released:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
 	echo "packaged:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
-	echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"						# ERASE THE BELOW: THEY'RE JUST DOC NOTES
+	echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"						# DOC NOTE
 	echo "homepage:	https://www.company.com" >>"${DIR_TEMP}/${NAME}.info"					# 	NOTE: these are all appended to main URL (homepage, git, repo)
 	echo "download:	path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"					# oem direct download link from their website
 	echo "git:		https://distributor.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"		# oem git url
@@ -1029,16 +996,6 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "PROP=0		# make mrproper" >>config
 	echo "TEST=0		# make test" >>config
 	echo "SORT=TRUE	# indicates the package contents need sorting (on this pass)" >>config
-	echo >>config
-	echo "# The URL to the developers source code used with this builder profile" >>config
-	echo "# NOTES:" >>config
-	echo "#     - if doing multi-pass, this needs to be in the first config file" >>config
-	echo "#     - this is optional but does allow a '-C dev' call" >>config
-	echo "URL_CODE=''" >>config
-	echo >>config
-	echo "# Same as above, but the URL to the online git repo for the project" >>config
-	echo "GIT_REPO=''" >>config
-	echo >>config
 	echo "# The below variable is optional and should only be used when compiling more" >>config
 	echo "# than one software with a single builder profile. For example you can compile" >>config
 	echo "# both alsa-libs and alsa-utils with a single 'builder alsa' command if the" >>config
@@ -1046,9 +1003,17 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "# This value would uniquely identify which source code directory to use per pass" >>config
 	echo "CODE=''" >>config
 	echo >>config
+	echo "# The URL to the developers source code located in a git repo" >>config
+	echo "# NOTES:" >>config
+	echo "#     - if doing multi-pass, this needs to be in the first config file" >>config
+	echo "#     - this is optional but does allow a '-C git|dev' call" >>config
+	echo "GIT_REPO=''" >>config
+	echo "# Same as above, but the URL to a non-git (homepage) download link" >>config
+	echo "URL_CODE=''" >>config
+	echo >>config
 	echo "# If the compile type is 'custom', you need to specify all commands here" >>config
-	echo "# For example: gcc -O whatever" >>config
-	echo "# NOTE: if this contains variables, still surround them in single quotes!!!" >>config
+	echo "# For example: gcc -O foo" >>config
+	echo "# NOTE: if this contains variables, still surround it with single quotes!!!" >>config
 	echo "CUSTOM=''" >>config
 	echo >>config
 	echo "# Uncomment any of the directory installation locations you wish to modify" >>config
@@ -1062,30 +1027,33 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "#DIR_SCRIPTS=\"\${DIR_INST}/etc/init.d\"" >>config
 	echo >>config
 	echo "# Modify any of the directory configuration locations below" >>config
-	echo "CFG_BIN=\"\${DIR_INST}/bin\"" >>config
-	echo "CFG_DATA=\"\${DIR_INST}/share\"" >>config
-	echo "CFG_DATAROOT=\"\${CFG_DATA}\"" >>config
-	echo "CFG_DOC=\"\${CFG_DATA}/doc/NAME\"" >>config
-	echo "CFG_DVI=\"\${CFG_DOC}\"" >>config
-	echo "CFG_HTML=\"\${CFG_DOC}\"" >>config
-	echo "CFG_INCLUDE=\"\${DIR_INST}/include\"" >>config
-	echo "CFG_INFO=\"\${CFG_DATA}/info\"" >>config
-	echo "CFG_LIB=\"\${DIR_INST}/lib\"" >>config
-	echo "CFG_LIBEXEC=\"\${DIR_INST}/libexec\"" >>config
-	echo "CFG_LOCALE=\"\${CFG_DATA}/locale\"" >>config
-	echo "CFG_LOCALSTATE=\"\${DIR_INST}/var\"" >>config
-	echo "CFG_MAN=\"\${CFG_DATA}/man\"" >>config
-	echo "CFG_OLDINCLUDE=\"/usr/include\"" >>config
-	echo "CFG_PDF=\"\${CFG_DOC}\"" >>config
-	echo "CFG_PS=\"\${CFG_DOC}\"" >>config
-	echo "CFG_SBIN=\"\${DIR_INST}/sbin\"" >>config
-	echo "CFG_SHAREDSTATE=\"\${DIR_INST}/com\"" >>config
-	echo "CFG_SYSCONFIG=\"\${DIR_INST}/etc\"" >>config
+	echo "#CFG_BIN=\"\${DIR_INST}/bin\"" >>config
+	echo "#CFG_DATA=\"\${DIR_INST}/share\"" >>config
+	echo "#CFG_DATAROOT=\"\${CFG_DATA}\"" >>config
+	echo "#CFG_DOC=\"\${CFG_DATA}/doc/NAME\"" >>config
+	echo "#CFG_DVI=\"\${CFG_DOC}\"" >>config
+	echo "#CFG_HTML=\"\${CFG_DOC}\"" >>config
+	echo "#CFG_INCLUDE=\"\${DIR_INST}/include\"" >>config
+	echo "#CFG_INFO=\"\${CFG_DATA}/info\"" >>config
+	echo "#CFG_LIB=\"\${DIR_INST}/lib\"" >>config
+	echo "#CFG_LIBEXEC=\"\${DIR_INST}/libexec\"" >>config
+	echo "#CFG_LOCALE=\"\${CFG_DATA}/locale\"" >>config
+	echo "#CFG_LOCALSTATE=\"\${DIR_INST}/var\"" >>config
+	echo "#CFG_MAN=\"\${CFG_DATA}/man\"" >>config
+	echo "#CFG_OLDINCLUDE=\"/usr/include\"" >>config
+	echo "#CFG_PDF=\"\${CFG_DOC}\"" >>config
+	echo "#CFG_PS=\"\${CFG_DOC}\"" >>config
+	echo "#CFG_SBIN=\"\${DIR_INST}/sbin\"" >>config
+	echo "#CFG_SHAREDSTATE=\"\${DIR_INST}/com\"" >>config
+	echo "#CFG_SYSCONFIG=\"\${DIR_INST}/etc\"" >>config
 	echo "# The CFG_MISC is a builder extra variable that can be used per project, but will" >>config
 	echo "# need its associated switch. So, for example, mplayer has a non-standard switch" >>config
 	echo "# to place its codecs. Simply enter \"--codec-dir='/whatever/dir'\" for this" >>config
 	echo "# variable value to use it." >>config
 	echo "#CFG_MISC=\"\"" >>config
+	echo >>config
+	echo "# Specify compile-time package dependency list to build this software" >>config
+	echo "DEP_MAKE_PAK=''" >>config
 	echo >>config
 	echo "# Specify run-time package dependency list for each package type:" >>config
 	echo "# (e.g. DEP_MAKE_PAK='autogen')" >>config
@@ -1098,8 +1066,6 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "DEP_EXEC_GIR=''		# only gir files" >>config
 	echo "DEP_EXEC_LIB=''		# only libs" >>config
 	echo "DEP_EXEC_LOC=''		# only locale files" >>config
-	echo "# Specify compile-time package dependency list to build this software" >>config
-	echo "DEP_MAKE_PAK=''" >>config
 	echo >>config
 	echo "FLAG_CONF=\"--prefix=\${DIR_INST}\"		# parameters to pass to 'configure'" >>config
 	echo "FLAG_INST=\"DESTDIR=\${DIR_DUMP}/\${NAME}\"		# parameters to pass to 'make install'" >>config
@@ -1154,7 +1120,7 @@ fi
 
 # CHECK FOR PRIOR FAILED ATTEMPTS
 
-# if either directory exists -AND- we are doing a single pass -or- on the first pass of a multi-pass (via cli or params file) and the .pass file doesn't exist (via 'stop failed'), then...
+# if any directory exists -AND- we are doing a single pass -or- on the first pass of a multi-pass (via cli or params file) and the .pass file doesn't exist (via 'stop failed'), then...
 if ( [ -d "${DIR_DUMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}.bin" ] ) && ( [ ! "$PASS" ] || ( [ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] ) ); then
 	echo -n "It appears a prior (attempted) compile has left files behind, cleanup? [Y/N] (N): "
 	read

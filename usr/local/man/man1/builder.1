@@ -47,7 +47,7 @@ OPTIONS:
 
 .SH TOC
 1.  DESCRIPTION
-2.  CONFIG
+2.  CONFIGS
 3.  PARAMETERS
 4.  ACTIONS
 5.  OPTIONS
@@ -104,58 +104,130 @@ from their website.
 
 
 
-.SH CONFIG
+.SH CONFIGS
 There are several configuration files that are used with builder. The main
-file is used to set global values, but these can be overwritten in other
-configs.  *define the search order, with switches taking precedence*
+file is used to define global variable and default profile values, and is
+typically located in '/etc/builder'. To provide flexibility, there are
+three additional directories that are permissible. Each can exist and also
+modify the values: '/usr/local/etc/builder', '~/.etc/builder' (XSB), and
+'~/.builder' (LSB). None of these variables can be adjusted using passed
+values to builder.
 
-There are a variety of values that can be modified so that pax can work
-with any Linux distro. This ranges from package storage locations and
-operational directories, to package extensions and schemas. Each value
-will be covered below, but first lets discuss config file placements.
-There are three locations that pax searches for its configuration. The
-first is the system-wide settings found in /etc/pax/config. The second
-and third locations are for personal configurations and are found in
-~/.etc/pax/config (XSB) and ~/.pax/config (LSB). The search order is
-completed by the passed values during execution, each instance taking
-precedence over its predecessor.
+The other configuration file is included in each builder profile. There
+are some overlaping of values as stated above, but also several that are
+unique. Unlike the global config, there is only one place that this file
+can be stored - the root of the profile. However, this file can utilize
+a numeric extension to designate different values depending on the number
+of passes a software needs to be fully compiled. This extension needs to
+correspond with the pass. So, it a single pass is required, the filename
+should remain as 'config' with no extension. If a software requires two or
+more passes, there should be an equal number of files using the naming
+convention 'config.1', 'config.2', etc, each with their own configuration
+definitions that correspond to the pass number. None of these variables
+can be adjusted using passed values to builder.
+
+While not a configuration file, there is one other file that needs to be
+discussed. This file also would reside alongside the 'config' in each
+builder profile, and is named 'params'. Like its associated 'config', this
+file can also have numeric file extensions for multi-pass profiles. The
+function of this file is to define the parameter values that should be
+passed to builder when building software. This will prevent mistakes by
+end users who would not know what values to pass. For example, if the
+software required two passes, instead of informing the end       user to pass a
+'-N 2', you can simply add a 'PASS=2' value in this file and builder will
+substitute that in for the absence of the passed parameter.
 
 To summarize:
-  o The search order: /etc/pax, ~/.[etc/]pax, passed values
+  o The global config search order:
+    /etc/builder, /usr/local/etc/builder, ~/.etc/builder, ~/.builder
+  o The profile config naming convention:
+    config[.1, .2, ...]
+    params[.1, .2, ...]
 
+Before explaining each variable in detail, it is important to note that
+some of these values can contain variables themselves (if desired). Those
+that fall within this scope must have their value enclosed with single
+quotes (') as they are interprited at specific times of execution instead
+of the initial loading of the script. The variables for use are:
+  ${NAME} - the package name
+  ${ARCH} - the devices' CPU architecture
+  ${PACK} - package type (e.g. bin, doc, lib, etc)
+  ${PASS} - the current pass number
 We will now cover each variable available for adjustment in the config
-file.
+files, noting when any of the above variables can be utilized.
 
-.I Local Repo Values
 
-.B REPO_PREFIX
-This directory contains the file lists (LIST_BOOT and LIST_LIVE) as well
-as the directories containing your downloaded software packages. So just
-as the name suggests, its the prefix to your local repo.
+.I Global Config
 
-.B REPO_OPTION
-A sub-directory of REPO_PREFIX, this directory stores all the optional
-software that is added to a basic operating system.
+.B DEBUG
+To see the commands that take place while builder is being executed, set
+this value to 1. The log will then contain that additional information.
 
-.B REPO_SYSTEM
-Like the previous variable, this one also stores additional software.
-However, this directory would contain packages to expand a default OS.
-For example, XiniX VE stores all the X11 packages in here to load during
-the device bootup. This can also contain packages like NTFS so that
-filesystems of that type are available for usage. Basically any software
-that the base operating system would need, should be added here. Also of
-note, this is the default directory processed when the -B switch is
-passed.
 
-.B REPO_RESTOR
-Specific to pax, this package manager creates restore points when a user
-uninstalls software by issuing a '-u delete', '-u purge', or '-u update'
-switch.
+.B DIR_DUMP
+As the name suggests, this is the staging area that is used to dump the
+compiled program into before making the (various) package(s) for
+distribution.
 
-.I Directory Values
+.B DIR_INST
+Similar to the PREFIX value when compiling, this value allows a directory
+structure to be injected into the overall path where the compiled software
+will reside. In an LSB environment, this value will be '/usr/local' for
+everything that i's not part of the OS. If using XSB, then this value will
+remain blank since packages can be installed in multiple locations, each
+mirroring the same directory structure.
 
-.B DIR_INIT
-This directory contains the daemon service scripts.
+.B DIR_PROF
+This variable stores the location of the builder profiles, and should NOT
+include the NAME variable as part of its value.
+
+.B DIR_REPO
+If the user elects to create distributable packages (using the -b action),
+then this directory is used to store those generated files. This directory
+is also used when passing '-C dir' as the location where the source code
+currently resides.
+
+.B DIR_TEMP
+The directory that is used for temporary files created during the building
+process.
+
+
+.B DEP_MAKE_ALL
+There are always packages that need to be installed in order to compile
+software. This variable lists any and all that are essential to this task.
+For example, if your distro packages are squashfs files, then one of the
+items in this list should be 'squashfs-tools'. There is a complimentary
+variable in the other config file where packages specific to that software
+can be defined.
+
+
+.B EXT_BLDR
+[tgz file] The file extension used for the package builder profile
+
+.B EXT_CODE
+[tgz file] The file extension used for a package source code
+
+.B EXT_DEPS
+[text file] The file extension used for the package dependency list
+
+.B EXT_HASH
+[text file] The file extension used for the package validation hash
+
+.B EXT_INFO
+[text file] The file extension used for the package details info
+
+.B EXT_LIST
+[text file] The file extension used for the package manifest info
+
+.B EXT_MAKE
+[text file] The file extension used for the package make commands
+
+.B EXT_SOFT
+[mksquashfs file] The file extension of the actual packaged software
+
+
+
+
 
 .B DIR_INST
 This directory contains the package installation scripts.
@@ -184,30 +256,6 @@ This directory contains the mount points for symlinked packages.
 This directory contains temp files used by the software.
 
 .I Package Extensions
-
-.B EXT_CORE
-[text file] Used to mark a package as part of the base OS
-
-.B EXT_CODE
-[tgz file] The file extension used for a packages' source code
-
-.B EXT_DEPS
-[text file] The file extension used for the package dependency list
-
-.B EXT_HASH
-[text file] The file extension used for the package validation hash
-
-.B EXT_INFO
-[text file] The file extension used for the package details info
-
-.B EXT_LIST
-[text file] The file extension used for the package manifest info
-
-.B EXT_MAKE
-[text file] The file extension used for the package make commands
-
-.B EXT_SOFT
-[mksquashfs file] The file extension of the actual packaged software
 
 .I Log Files
 
@@ -349,12 +397,6 @@ This variable includes any unique command for the distro that needs to be
 called after all packages are loaded. If the value contains the variable
 ${PACKAGE}, then it will be called once for every package passed into pax.
 In its absence, the command will be called once.
-
-.B DEBUG
-To see everything that takes place while pax is being executed, set this
-value to 1. A pax.debug log will be produced containing a plethora of
-information. Setting this value to 2 will additional prompt before any
-actual system changes take place.
 
 .B COLORS
 If you like colored output, then set this to 'TRUE' and avoid having to
