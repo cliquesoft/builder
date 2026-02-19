@@ -1,0 +1,57 @@
+name:		builder
+title:		The XiniX Package Builder
+description:	A convenient, practical package builder
+version:	2026.02.??.1
+released:	2026.02.??
+packaged:	2026.02.??
+authors:	Cliquesoft
+homepage:	https://www.cliquesoft.org
+download:	_REPO/official/1.0/builder/stable.tgz
+git:		https://github.com/cliquesoft/builder
+commit:		commit/002b43725c2879675caccf749520cf5e5bbe91c3
+file:		archive/refs/tags/2026.02.??.1.tar.gz
+clone:		.git
+repo:		https://www.cliquesoft.org/official/vanilla/1.0/builder
+package:	stable.soft
+source:		stable.code
+builder:	stable.bldr
+compile:	stable.make
+size:		106K
+category:	utility
+interface:	cli
+toolkit:	shell
+rating:		g
+license:	BSD 2-Clause
+document:	https://www.cliquesoft.org/#Licenses
+maintainer:	wysiwyg
+tags:		builder profile build package repackage re-package compile gcc git autoconf autogen bootstrap cmake custom configure make install scons
+overview:	A convenient, practical package builder for Linux distros that
+		enables a user to compile and/or package software quickly and
+		effortlessly. Designed to be as comprehensive as possible, this
+		project can automatically process compilation dependencies,
+		obtain source code (from a variety of locations), apply desired
+		patches, compile (for a variety of CPU architectures), install
+		(along with any additional files), and finally build distro
+		package(s).
+comments:	This project is suitable for end users, developers, and package
+		maintainers. Any users wishing to build from scratch can easily
+		do so with a short, simple command. Developers are free to use
+		any supported compiling framework to generate a generic profile
+		for package maintainers to modify specifically for their Linux
+		distro. Once a projects' source code has been made publically
+		available, all that's required is the profile and anyone can
+		utilize the software. No complicated prerequisites to manage,
+		no lengthy manuals to read through - just a simple, single,
+		short command!
+		  [PLANNED UPDATES]
+		There are several planned updates that will eventually be
+		added. Patches or donations are welcome and will expedite
+		future updates. Features include:
+		- Added output options: 'json', 'html', 'xml'
+		- A DIRECTORY parameter for flexibility
+		- A graphical interface
+		- Automated package checking/downloading/updating
+		- Ability to process .deb (and other) package types
+		Feature requests can be sent to: service@cliquesoft.org
+changes:	
+

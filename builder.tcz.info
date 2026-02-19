@@ -1,0 +1,53 @@
+Title:          builder.tcz
+Description:    A convenient, practical package builder
+Version:        2026.02.??.1
+Author:         Cliquesoft
+Original-site:  https://www.cliquesoft.org
+Copying-policy: BSD 2-Clause
+Size:           106K
+Extension_by:   wysiwyg
+Tags:           builder profile build package repackage re-package compile gcc git autoconf autogen bootstrap cmake custom configure make install scons
+Comments:       A convenient, practical package builder for Linux distros that
+                enables a user to compile and/or package software quickly and
+                effortlessly. Designed to be as comprehensive as possible, this
+                project can automatically process compilation dependencies,
+                obtain source code (from a variety of locations), apply desired
+                patches, compile (for a variety of CPU architectures), install
+                (along with any additional files), and finally build distro
+                package(s).
+                ----
+                This project is suitable for end users, developers, and package
+                maintainers. Any users wishing to build from scratch can easily
+                do so with a short, simple command. Developers are free to use
+                any supported compiling framework to generate a generic profile
+                for package maintainers to modify specifically for their Linux
+                distro. Once a projects' source code has been made publically
+                available, all that's required is the profile and anyone can
+                utilize the software. No complicated prerequisites to manage,
+                no lengthy manuals to read through - just a simple, single,
+		short command!
+                  [PLANNED UPDATES]
+                There are several planned updates that will eventually be
+                added. Patches or donations are welcome and will expedite
+                future updates. Features include:
+                - Added output options: 'json', 'html', 'xml'
+                - A DIRECTORY parameter for flexibility
+                - A graphical interface
+                - Automated package checking/downloading/updating
+                - Ability to process .deb (and other) package types
+                Feature requests can be sent to: service@cliquesoft.org
+                  [OTHER PROJECTS]
+                Feel free to check out some of our other projects. If they are
+                not in the repo yet, they will be soon. Visit our website to
+                obtain them otherwise @ cliquesoft.org.
+                - pax: a leightweight package manager
+                - dittodata: a data backup/copy tool
+                - fxWM: a lightweight window manager configured via CSS
+                - web.de: a web-based desktop environment
+                ----
+                Valid for all versions of TC
+                ----
+                PPI Compatible
+Change-log:     2026/02/?? First version
+                See https://github.com/cliquesoft/builder/blob/main/CHANGE.log
+Current:        2026/02/?? Current short change description

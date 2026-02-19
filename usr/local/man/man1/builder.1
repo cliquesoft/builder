@@ -63,12 +63,13 @@ OPTIONS:
 .I builder
 was created to not only make it easier to compile software, but to also
 enable a quick way to distribute the means of doing so. Imagine having a
-very small file that contains the dependencies required to compile, the
-places to obtain the source code, any desired patches, and any additional
-files to include in an installation (e.g. desktop files). That file, which
-is known as a "builder profile", can be parsed by builder to automatically
-carry out each of those steps, with an optional final process of creating
-distribution packages - making this suitable for end users and package
+very small file that contains the dependencies and instructions required
+to compile (for various CPU architectures), one or more places to obtain
+the source code, any desired patches, and any additional files to include
+in an installation (e.g. desktop files). That file, which is known as a
+"builder profile", can be parsed by builder to automatically carry out
+each of those steps, with an optional final process of creating packages
+for distribution - making this suitable for normal end users and package
 maintainers alike! By simply making the builder profile available, anyone
 can quickly and effortlessly compile any software by issuing a single,
 short command!
@@ -119,7 +120,7 @@ unique. Unlike the global config, there is only one place that this file
 can be stored - the root of the profile. However, this file can utilize
 a numeric extension to designate different values depending on the number
 of passes a software needs to be fully compiled. This extension needs to
-correspond with the pass. So, it a single pass is required, the filename
+correspond with the pass. So, if a single pass is required, the filename
 should remain as 'config' with no extension. If a software requires two or
 more passes, there should be an equal number of files using the naming
 convention 'config.1', 'config.2', etc, each with their own configuration
@@ -133,9 +134,9 @@ file can also have numeric file extensions for multi-pass profiles. The
 function of this file is to define the parameter values that should be
 passed to builder when building software. This will prevent mistakes by
 end users who would not know what values to pass. For example, if the
-software required two passes, instead of informing the end       user to pass a
+software required two passes, instead of informing the end user to pass a
 '-N 2', you can simply add a 'PASS=2' value in this file and builder will
-substitute that in for the absence of the passed parameter.
+acknowledge that for the absence of the passed parameter.
 
 To summarize:
   o The global config search order:
@@ -149,10 +150,10 @@ some of these values can contain variables themselves (if desired). Those
 that fall within this scope must have their value enclosed with single
 quotes (') as they are interprited at specific times of execution instead
 of the initial loading of the script. The variables for use are:
-  ${NAME} - the package name
-  ${ARCH} - the devices' CPU architecture
+  ${NAME} - package name
+  ${ARCH} - devices' CPU architecture
   ${PACK} - package type (e.g. bin, doc, lib, etc)
-  ${PASS} - the current pass number
+  ${PASS} - current pass number
 We will now cover each variable available for adjustment in the config
 files, noting when any of the above variables can be utilized.
 
@@ -202,7 +203,9 @@ can be defined.
 
 
 .B EXT_BLDR
-[tgz file] The file extension used for the package builder profile
+[tgz file] The file extension used for the package builder profile. These
+values can utilize any of the naming variables listed at the top of this
+section and should be enclosed with single quotes (').
 
 .B EXT_CODE
 [tgz file] The file extension used for a package source code
@@ -226,15 +229,82 @@ can be defined.
 [mksquashfs file] The file extension of the actual packaged software
 
 
+.B OWN_USER
+If the software is simply being compiled (using the -c action), then this
+value will be ignored. When a distributable package is being created, this
+is used to apply that ownership to the files and directories. This value
+can be either usernames or their numeric equivalents. Although this will
+be applied to everything in the package, finite modifications of ownership
+can be applied using the 'pre.package' script.
+
+.B OWN_GROUP
+Like the OWN_USER, this is also part of the ownership of the data within
+the packages, but for group ownership.
+
+
+.B PRM_DIRS
+Working in conjunction with the OWN_* values, these three provide the
+permissions that get applied to various parts of the package. In this
+case, the value here gets applied to all the directories. The value can be
+in numeric form (using three or four digits) or using symbols (e.g. u+rX).
+Specific modifications can also be implemented using the 'pre.package'
+script.
+
+.B PRM_EXECS
+The permissions for binaries/executables
+
+.B PRM_FILES
+The permissions for all other files
+
+
+.B URL_INFO
+In order for builder to perform some of its steps, it needs access to the
+proper information. Some of this information can be stored in a .info file
+created by a Linux distribution. This variable stores the URL to that file
+so it can be downloaded and processed by builder. These two values can
+utilize any of the naming variables listed at the top of this section and
+should be enclosed with single quotes (').
+
+.B URL_REPO
+This URL should point to the package source code for the Linux distro.
+
+
+.B SPM_ALL
+Working with the DEP_MAKE_ALL variable, this one stores the actual command
+to install the packages listed. The DEP_MAKE_ALL variable needs to be part
+of this value.
+
+.B SPM_PACK
+Like SPM_ALL, this variable is also responsible for the installation of
+dependencies. However, this one works with the DEP_MAKE_PAK value defined
+in the builder profile 'config' file.
+
+.B SPM_MAKE
+The command listed for this variable needs to be all the commands required
+to create the package files
+LEFT OFF - list the variables allowed in this one
+
+.B SPM_UNLD
+To maintain a tidy environment, include the command to unload the packages
+listed in the DEP_MAKE_ALL and/or DEP_MAKE_PAK variables. A blank value
+disables this process.
+
+
+.B LOG
+The log file for all executions of builder
+
+
+.B SUDO
+Depending on the account used to run builder, the use of sudo may be
+required to perform an installation, or ownership and permission change of
+the files when packaging. If the executing account does not have sufficent
+privileges, you can set this value to 'TRUE'. If you require switches to
+be passed to sudo, you can also list them here (e.g. SUDO='sudo -x -y -z).
 
 
 
-.B DIR_INST
-This directory contains the package installation scripts.
 
-.B DIR_LIST
-This directory contains the additional package files for installed
-software.
+
 
 .B DIR_LIVE
 Once a device has booted, this is the default directory where packages
@@ -246,12 +316,6 @@ the packaged files. So, for example, if a package contains a file in
 the /etc directory, it would then become /Users/Public/.etc in the
 XiniX OS (or any other using that notation).
 
-.B DIR_LOGS
-This directory contains the softwares logs.
-
-.B DIR_LOOP
-This directory contains the mount points for symlinked packages.
-
 .B DIR_TEMP
 This directory contains temp files used by the software.
 
@@ -259,22 +323,7 @@ This directory contains temp files used by the software.
 
 .I Log Files
 
-.B LOG_DBUG
-The log file for debug output
-
-.B LOG_ERRS
-The log file for (error) output
-
 .I Ownership and Permissions
-
-.B OWN_GROUP
-The default group that all users are members of
-
-.B OWN_SYSTEM
-The full ownership (user and group) of REPO_SYSTEM directory
-
-.B PRM_SYSTEM
-The permissions that the REPO_SYSTEM directory must have (for security)
 
 .I Value Definitions
 
