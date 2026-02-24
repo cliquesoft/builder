@@ -118,3 +118,11 @@
 - Added the .deps and .info files to the project
 - Continued creating the man page
 
+2026/02/24
+- Renamed DIR to ID (for use with SPM_MAKE)
+- Renamed TYPE to METHOD
+- Renamed PACK to TYPE
+- Updated DIR_MARKERS as an optional variable
+- Updated the CFG_LIBEXEC value
+- Continued creating the man page
+

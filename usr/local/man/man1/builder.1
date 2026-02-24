@@ -134,7 +134,7 @@ file can also have numeric file extensions for multi-pass profiles. The
 function of this file is to define the parameter values that should be
 passed to builder when building software. This will prevent mistakes by
 end users who would not know what values to pass. For example, if the
-software required two passes, instead of informing the end user to pass a
+software required two passes, instead of informing every end user to pass
 '-N 2', you can simply add a 'PASS=2' value in this file and builder will
 acknowledge that for the absence of the passed parameter.
 
@@ -152,10 +152,12 @@ quotes (') as they are interprited at specific times of execution instead
 of the initial loading of the script. The variables for use are:
   ${NAME} - package name
   ${ARCH} - devices' CPU architecture
-  ${PACK} - package type (e.g. bin, doc, lib, etc)
+  ${TYPE} - package type (e.g. bin, doc, lib, etc)
   ${PASS} - current pass number
 We will now cover each variable available for adjustment in the config
 files, noting when any of the above variables can be utilized.
+
+
 
 
 .I Global Config
@@ -281,8 +283,15 @@ in the builder profile 'config' file.
 
 .B SPM_MAKE
 The command listed for this variable needs to be all the commands required
-to create the package files
-LEFT OFF - list the variables allowed in this one
+to create the package file(s). There are several variables available for
+use with this command:
+  ${ID}       - directory or package name (depending on the configuration)
+  ${TYPE}     - package type (e.g. bin, doc, drv, etc)
+  ${PAK_DEPS} - the interpreted package deps file extension
+  ${PAK_HASH} - the interpreted package hash file extension
+  ${PAK_INFO} - the interpreted package info file extension
+  ${PAK_LIST} - the interpreted package list file extension
+  ${PAK_SOFT} - the interpreted package soft file extension
 
 .B SPM_UNLD
 To maintain a tidy environment, include the command to unload the packages
@@ -302,6 +311,213 @@ privileges, you can set this value to 'TRUE'. If you require switches to
 be passed to sudo, you can also list them here (e.g. SUDO='sudo -x -y -z).
 
 
+.B PATH_PKGCFG
+This directory contains temp files used by the software.
+
+
+.B FLAG_A32
+These are the compile flags for ARM 32bit CPU architectures
+
+.B FLAG_A64
+These are the compile flags for ARM 64bit CPU architectures
+
+.B FLAG_I32
+These are the compile flags for Intel/AMD 32bit CPU architectures
+
+.B FLAG_I64
+These are the compile flags for Intel/AMD 64bit CPU architectures
+
+.B FLAG_R32
+These are the compile flags for Raspberry Pi 32bit CPU architectures
+
+.B FLAG_R64
+These are the compile flags for Raspberry Pi 64bit CPU architectures
+
+NOTE: the above flags can be universally set in the main config file, with
+per-instance adjustments made in the builder profile config. These values
+can also incorporate any of the special variables outlined at the top of
+this section, as well as PATH_PKGCFG.
+
+This configuration file can also contain all the variables in the below
+section that begin with DIR_ and CFG_, and will act at the defaults.
+
+
+
+
+.I Profile Config
+
+Each of these variables can also be defined in the global config as the
+default values used, with the ones in this file being specific instances
+where deviation is required. It is important to note that these values
+should include the DIR_INST variable so that any desired directory prefix
+can be applied to the installation path (e.g. /usr/local)
+
+.B DIR_BIN
+The directory used to store general use binaries
+
+.B DIR_ETC
+The directory used to store software configurations
+
+.B DIR_LIB
+The directory used to store common use libraries
+
+.B DIR_SBIN
+The directory used to store elevated privileged binaries
+
+.B DIR_SHARE
+The directory used to store common use files
+
+.B DIR_VAR
+The directory used to store variable data files
+
+.B DIR_MARKERS
+The directory used to store installed package (cache) data
+
+.B DIR_SCRIPTS
+The directory used to store service start/stop scripts
+
+
+.B CFG_BIN="${DIR_INST}/bin"
+The configure scripts directory location for general use binaries
+
+.B CFG_DATA="${DIR_INST}/share"
+The configure scripts directory location for common use files
+
+.B CFG_DATAROOT="${CFG_DATA}"
+The configure scripts directory location for common use files
+
+.B CFG_DOC="${CFG_DATA}/doc/${NAME}"
+The configure scripts directory location for documentation files
+
+.B CFG_DVI="${CFG_DOC}"
+The configure scripts directory location for print related files
+
+.B CFG_HTML="${CFG_DOC}"
+The configure scripts directory location for HTML-based doc files
+
+.B CFG_INCLUDE="${DIR_INST}/include"
+The configure scripts directory location for compiling header files
+
+.B CFG_INFO="${CFG_DATA}/info"
+The configure scripts directory location for documentation files
+
+.B CFG_LIB="${DIR_INST}/lib"
+The configure scripts directory location for common use libraries
+
+.B CFG_LIBEXEC="${DIR_INST}/libexec"
+The configure scripts directory location for executable libraries
+
+.B CFG_LOCALE="${CFG_DATA}/locale"
+The configure scripts directory location for region specific files
+
+.B CFG_LOCALSTATE="${DIR_INST}/var"
+The configure scripts directory location for variable data files
+
+.B CFG_MAN="${CFG_DATA}/man"
+The configure scripts directory location for documentation files
+
+.B CFG_OLDINCLUDE="${DIR_INST}/include"
+The configure scripts directory location for compiling header files
+
+.B CFG_PDF="${CFG_DOC}"
+The configure scripts directory location for documentation files
+
+.B CFG_PS="${CFG_DOC}"
+The configure scripts directory location for documentation files
+
+.B CFG_SBIN="${DIR_INST}/sbin"
+The configure scripts directory location for elevated privileged binaries
+
+.B CFG_SHAREDSTATE="${DIR_INST}/com"
+The configure scripts directory location for shared state files
+
+.B CFG_SYSCONFIG="${DIR_INST}/etc"
+The configure scripts directory location for software configurations
+
+.B CFG_MISC
+This variable is unique to the builder profile config only, NOT the global
+configuration! This value gets added to the 'configure' call so this value
+needs to have its switch included. For example, mplayer has a non-standard
+switch to place its codecs. Simply add "--codec-dir='/whatever/dir'" for
+this variable value to use it.
+
+
+The variables below are specific to the builder profile config file and
+define various aspects for the individual software.
+
+.B CHECK
+Indicates that a 'make check' command needs to be run; 0=no, 1=yes
+
+.B CLEAN
+Indicates that a 'make clean' command needs to be run. A value of '2' indicates
+that a 'make distclean' needs to be run instead; 0=no, 1=yes, 2=yes
+
+.B CONF
+Indicates that a 'configure' command needs to be run; 0=no, 1=yes
+
+.B PROP
+Indicates that a 'make mrproper' command needs to be run; 0=no, 1=yes
+
+.B TEST
+Indicates that a 'make test' command needs to be run; 0=no, 1=yes
+
+.B SORT
+Indicates the package contents need sorting (on this pass); a blank value
+means no, any other value means yes.
+
+.B CODE
+This variable is optional and should only be used when compiling more than
+one software with a single builder profile. For example you can compile
+both alsa-libs and alsa-utils with a single 'builder -b alsa' command if
+the config.1 file CODE value is 'alsa-libs' and config.2 file CODE value
+is 'alsa-utils'. This value would uniquely identify which source code
+directory to use per pass.
+
+
+.B GIT_REPO
+The URL to the developers source code located in a git repo. This value is
+optional, but does allow '-C git' to be passed. If the software requires a
+multi-pass, this needs to be in the config.1 file since the source needs
+to be downloaded in the first pass.
+
+.B URL_CODE
+Same as above, but the URL to a non-git (homepage) download link, allowing
+a '-C dev' to be passed. To make this easier, it is recommended to use a
+constant name for this value (e.g. domain.com/software/latest|stable).
+Obviously this would be up to the software author to institute such a
+naming convention.
+
+
+.B CUSTOM
+If the compile type is 'custom', you need to specify all commands here.
+For example: gcc -O foo
+This variable can contain any of the special variables outlined in the top
+of this section. Just be sure to surround it with single quotes when doing
+so!
+
+
+.B DEP_MAKE_PAK
+Most software needs one or more dependencies installed in order to compile
+successfully. Use this variable to list each that are required (separated
+using a single space).
+
+
+.B DEP_EXEC_ALL
+When creating a single distributable package (versus creating multiple
+packages) this variable will store the complete run-time dependencies list
+required for any aspect of the package to function properly. This value
+needs to be a space separated list of names.
+
+DEP_EXEC_BIN=''		# only binaries
+DEP_EXEC_DEV=''		# ony development files (e.g. *.h headers)
+DEP_EXEC_GIR=''		# only gir files
+DEP_EXEC_LIB=''		# only libs
+
+FLAG_CONF=\"--prefix=\${DIR_INST}\"		# parameters to pass to 'configure'
+FLAG_INST=\"DESTDIR=\${DIR_DUMP}/\${NAME}\"		# parameters to pass to 'make install'
+FLAG_MAKE=''					# parameters to pass to 'make'
+
+
 
 
 
@@ -316,9 +532,6 @@ the packaged files. So, for example, if a package contains a file in
 the /etc directory, it would then become /Users/Public/.etc in the
 XiniX OS (or any other using that notation).
 
-.B DIR_TEMP
-This directory contains temp files used by the software.
-
 .I Package Extensions
 
 .I Log Files
@@ -326,9 +539,6 @@ This directory contains temp files used by the software.
 .I Ownership and Permissions
 
 .I Value Definitions
-
-.B FIFO_SERVER
-The default name for the -o action fifo
 
 .B ARCH_VALUES
 The valid values for the -C option
