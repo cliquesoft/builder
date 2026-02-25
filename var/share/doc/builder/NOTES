@@ -1,0 +1,215 @@
+Overview
+
+	This file contains various bits of information about this project that
+	will be useful for the package maintainers of your Linux's distro.
+	Ultimately, a wiki page will be setup to contain this and additional
+	information to help those that want to use this software. Please direct
+	all questions to either our forums or staff via email:
+
+		https://forums.cliquesoft.org/
+		https://www.cliquesoft.org/#Contact
+		support@cliquesoft.org
+
+
+Building with builder
+
+	There are several ways to obtain the source code for software that you
+	would like to build, if you did not download it manually. Each is listed
+	below along with its related variable location:
+
+	1. local directory   '-C dir'   DIR_REPO @ /etc/builder/builder.conf
+	2. from developer    '-C dev'   URL_CODE @ package config[.1] file
+	3. distro repo       '-C repo'  URL_REPO @ /etc/builder/builder.conf
+	4. info file         '-C info'  URL_INFO @ /etc/builder/builder.conf
+
+	These would allow a user to download and compile software by issuing a
+	command such as:
+
+	builder -c -C repo ifplugd
+
+	To perform the same steps, but to additionally package the software for
+	a distro, don't pass the '-c':
+
+	builder -b -C repo ifplugd
+
+	Using any of the above methods, your present directory is irrelevent.
+	However, if you downloaded the source code manually, you need to be
+	inside its directory before issuing any commands. Likewise, you will
+	need to download its builder profile from either the developer or your
+	Linux distro repository, and install it beforehand:
+
+	1. Download the builder profile
+	2. builder -i NAME
+
+	It is also possible to build multiple related softwares using a single
+	builder profile. Take for example, the alsa project. It has two source
+	codes - alsa-lib and alsa-utils. You would need to configure an 'alsa'
+	builder profile using a multi-pass setup so that the first pass compiles
+	alsa-lib (with config.1 > CODE='alsa-lib') and the second pass compiles
+	alsa-utils (with config.2 > CODE='alsa-utils'). In this instance, you
+	would also need to be one level up in the directory structure:
+
+	# ls
+	alsa-lib-1.1.4.1/   alsa-utils-1.1.4/
+	# builder alsa
+
+
+Order of operations
+
+	Below we will list the order of operations that the builder script runs
+	when compiling and optionally packaging software:
+
+	1. Process passed switches
+	2. Adjust variable values via /etc/builder and ~/.etc/builder configs
+	3. System checks to make sure everything exists and is writable
+	4. Install compile-time dependencies
+	5. Optionally obtain the source code
+	6. Apply any patches to source code		pwd=source code
+	7. Execute pre.compile script			pwd=source code
+	8. Compile process (configure)			pwd=source code
+	9. Execute post.configure script		pwd=source code
+	10. Compile process (make, ..., make install)	pwd=source code
+	11. Copy in the 'extra' files			pwd=source code
+	12. Execute post.compile script			pwd=source code
+	13. Separate contents into individual packages	pwd=DIR_DUMP/NAME[.TYPE]
+		NOTE: can be skipped if SKIP=TRUE
+	14. Apply file/directory ownership/permissions	pwd=DIR_DUMP/NAME[.TYPE]
+		NOTE: will only be executed on the last pass
+	15. Execute pre.package script			pwd=DIR_DUMP
+		NOTE: apply any final file/directory ownerships/permissions now
+	16. Create the various packages			pwd=DIR_DUMP
+	17. Copy the files into the local repo		pwd=DIR_DUMP
+	18. Execute post.package script			pwd=DIR_DUMP
+	19. Cleanup					pwd=DIR_DUMP
+	20a. Initiate the next pass if requested
+	20b. Execute cleanup script as final command	pwd=DIR_DUMP
+
+
+Example directory structure
+
+	/etc/builder/ config					# global config file that personalizes the global variables set of top of script
+	/var/cache/builder/ foo/config[.1,.2,...]		# individual package files with specifics if the general compile options don't fit (see below)	NOTE: this is run while in the DIR_DUMP/NAME directory
+	/var/cache/builder/ foo/cleanup				# a script that will be executed to further clean up the file system
+	/var/cache/builder/ foo/params				# instead of passing the parameters on the command line, this file can be used instead
+	/var/cache/builder/ foo/pre.compile[.1,.2,...]		# a pre-compile script that can get run to perform any neccessary specific adjustments		NOTE: this is run while in the source code directory
+	/var/cache/builder/ foo/post.compile[.1,.2,...]		# same as above, but run post-compile								NOTE: this is run while in the source code directory
+	/var/cache/builder/ foo/pre.package[.1,.2,...]		# a pre-package script that can get run to perform any neccessary specific adjustments		NOTE: this is run while in the DIR_DUMP directory
+	/var/cache/builder/ foo/post.package[.1,.2,...]		# same as above, but run post-package								NOTE: this is run while in the DIR_DUMP directory
+	/var/cache/builder/ foo/proper[.1,.2,...]		# a flag (empty file) that indicates cleanup should occur automatically without prompt for each compiled package
+	/var/cache/builder/ foo/extras/ usr/local/tce.installed/foo	# stores any files that are not part of 'include' (e.g. httpd.conf for php compile); useful when DIRS=TRUE
+	/var/cache/builder/ foo/include[.1,.2,...]/ [VAR]/foo.conf	# contains things like .desktop files, icons, install and service markers/scripts, etc	NOTE: you can put things under directories like 'DIR_BIN/foo' to get copied into the directory tree associated with the DIR_BIN value (e.g. DIR_BIN='${DIR_INST}/bin' > /usr/local/bin/foo)
+	/var/cache/builder/ foo/patches[.1,.2,...]/ xyz_patch.cpp	# contains any distro specific patches to be applied pre-compile
+	/tmp/builder/						# the temporary location to store any information and files needed by this script
+	/tmp/staging/						# the staging location that stores the compiled software where it gets split and packaged
+	/tmp/repo/						# contains all the packaged software to be moved into an online repo
+
+
+Example foo/config		  NOTE: these are comprehensive or complementary
+
+	# Toggle the execution for any of these commands
+	# NOTE: when using multi-pass files (e.g. config.1, config.2), these can
+	#       be used to define which pass any of these commands are executed
+	#       depending on the value assigned in each config file
+	CHECK=1		# make check
+	CLEAN=0		# make clean; NOTE: a '2' value = 'make distclean'
+	CONF=1		# ./configure
+	PROP=0		# make mrproper
+	TEST=1		# make test
+	SORT=''		# indicates the package contents need sorting
+
+	# The URL to the developers source code used with this builder profile
+	# NOTES:
+	#     - if doing multi-pass, this needs to be in the first config file
+	#     - this is optional but does allow a '-C dev' call
+	URL_CODE=''
+
+	# The below variable is optional and should only be used when compiling
+	# more than one software with a single builder profile. For example you
+	# can compile both alsa-libs and alsa-utils with a single 'builder alsa'
+	# command if the config.1 CODE value is 'alsa-libs' and config.2 CODE
+	# value is 'alsa-utils'. This value would uniquely identify which source
+	# code directory to use per pass.
+	CODE=''
+
+	# NOTE: if this contains variables, still surround them in single quotes
+	COMPILE=''
+
+	# directory locations used with 'DIR_INCL'
+	DIR_BIN="${DIR_INST}/bin"
+	DIR_ETC="${DIR_INST}/etc"
+	DIR_LIB="${DIR_INST}/lib"
+	DIR_SBIN="${DIR_INST}/sbin"
+	DIR_SHARE="${DIR_INST}/share"
+	DIR_VAR="${DIR_INST}/var"
+
+	# directory locations used with 'configure'
+	CFG_BIN="${DIR_INST}/bin"
+	CFG_DATA="${DIR_INST}/share"
+	CFG_DATAROOT="${CFG_DATA}"
+	CFG_DOC="${DIR_INST}/share/doc/NAME"
+	CFG_DVI="${CFG_DOC}"
+	CFG_HTML="${CFG_DOC}"
+	CFG_INCLUDE="${DIR_INST}/include"
+	CFG_INFO="${CFG_DATA}/info"
+	CFG_LIB="${DIR_INST}/lib"
+	CFG_LIBEXEC="${DIR_INST}/libexec"
+	CFG_LOCALE="${CFG_DATA}/locale"
+	CFG_LOCALSTATE="${DIR_INST}/var"
+	CFG_MAN="${CFG_DATA}/man"
+	CFG_OLDINCLUDE="/usr/include"
+	CFG_PDF="${CFG_DOC}"
+	CFG_PS="${CFG_DOC}"
+	CFG_SBIN="${DIR_INST}/sbin"
+	CFG_SHAREDSTATE="${DIR_INST}/com"
+	CFG_SYSCONFIG=""
+	# The CFG_MISC is a builder extra variable that can be used per project,
+	# but will need its associated switch. So, for example, mplayer has a
+	# non-standard switch to place its codecs. Simply enter:
+	#   "--codec-dir='/whatever/dir'" for this variable value to use it.
+	CFG_MISC=""
+
+	# Specify run-time package dependency list for each package type:
+	# (e.g. DEP_MAKE_PAK='autogen\nmake\n...')
+	# if all compiled files go in a single package, use _ALL below
+	DEP_EXEC_ALL=''		# all files get placed in a single package
+	DEP_EXEC_BIN=''		# only binaries
+	DEP_EXEC_DEV=''		# ony development files (e.g. *.h headers)
+	DEP_EXEC_DOC=''		# only documentation
+	DEP_EXEC_DRV=''		# only kernel drivers
+	DEP_EXEC_GIR=''		# only gir files
+	DEP_EXEC_LIB=''		# only libs
+	DEP_EXEC_LOC=''		# only locale files
+	# Specify compile-time package dependency list to build this software
+	DEP_MAKE_PAK=''
+
+	FLAG_CONF='--enable-foo --disable-foo2'	# the 'configure'/'cmake' flags
+	FLAG_INST='--FOO1=foo --FOO2'		# the 'make install' flags
+	FLAG_MAKE='--FOO1=foo --FOO2'		# the 'make' flags
+
+	if [ "$ARCH" = 'i32' ]; then
+		EXPORTS="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
+			export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
+			export LDFLAGS='-Wl,-O1'
+			export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+	elif [ "$ARCH" = 'i64' ]; then
+		EXPORTS="export CFLAGS='-mtune=generic -Os -pipe'
+			export CXXFLAGS='-mtune=generic -Os -pipe'
+			export LDFLAGS='-Wl,-O1'
+			export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+	elif [ "$ARCH" = 'r32' ]; then
+		EXPORTS="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+			export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
+			export LDFLAGS='-Wl,-O1'
+			export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig:/usr/lib/pkgconfig'"
+	fi
+
+
+Example foo/params		  NOTE: these are comprehensive or complementary
+
+	ARCH='i32'	# current CPU architecture being compiled (e.g. i32)
+	DIRS=TRUE	# package using directory names instead of one directory
+	PASS=2		# specify the number of passes to make during compile
+	SKIP=TRUE	# indicates to skip packaging until the final pass
+	TRIM='^lib'	# removes part of the name when building the package
+	TYPE='autogen'	# specifies the type of make system to use
+

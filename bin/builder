@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/02/24 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/02/25 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -115,6 +115,7 @@ TEMP=''								# stores a temporary value
 
 # [names]
 export NAME=''							# the name of the package being compiled
+DIRECTORY=''							# the location to process
 
 # [actions]
 BUILD=''							# if we need to build a software package
@@ -125,7 +126,7 @@ REPACK=''							# indicates that we just need to repack the software since somet
 TEMPLATE=''							# creates a blank builder profile template and exit
 
 # [options]
-export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
+export ARCH='i64'						# the current CPU architecture being compiled (e.g. i32, i64, ...)
 DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
 INFOFILE=''							# stores the info file to download/use to obtain the software
 export PASS=''							# the number of passes to make during compile (blank disables)
@@ -133,7 +134,7 @@ PATCH=TRUE							# indicates we need to apply patches to the source code
 SKIP=''								# indicates we need to skip packaging until the final pass
 SINGLE=''							# indicates all files need to be placed in a single package
 TRIM=''								# any part of the name to remove when building the package
-METHOD=''							# the method of compile being performed (e.g. autogen, bootstrap, ...)
+METHOD='default'						# the method of compile being performed (e.g. autogen, bootstrap, ...)
 WGET=''								# indicates that we need to download the source code file; valid values: local, private, public
 UNLOAD=''							# indicates we need to unload the packages afterwards - regardless of success or failure
 
@@ -149,7 +150,7 @@ export CODE=''							# when compiling multiple softwares with a single builder p
 export GIT_REPO=''						# the online git repo that can be cloned (set in a package config file)
 export URL_CODE=''						# the developer URL used to obtain the package source code (set in a package config file)
 
-export CUSTOM=''						# used when TYPE='custom'
+export CUSTOM=''						# used when METHOD='custom'
 
 export DIR_BIN="${DIR_INST}/bin"				# software installation directory locations
 export DIR_ETC="${DIR_INST}/etc"
@@ -182,14 +183,10 @@ export CFG_SYSCONFIG="${DIR_INST}/etc"
 export CFG_MISC=""						# a standardized extra variable that can be used per project (e.g. mplayer codecs)	NOTE: this one will need to include the switch as well (e.g. '--codec-dir=...')
 
 export DEP_MAKE_PAK=''						# compile-time deps list for a specific project
-export DEP_EXEC_ALL=''
 export DEP_EXEC_BIN=''						# run-time deps list for each package type
 export DEP_EXEC_DEV=''
-export DEP_EXEC_DOC=''
-export DEP_EXEC_DRV=''
 export DEP_EXEC_GIR=''
 export DEP_EXEC_LIB=''
-export DEP_EXEC_LOC=''
 
 export FLAG_CONF=''						# the flags to pass to the 'configure' script or 'cmake'
 export FLAG_INST=''						# the flags to pass to the 'make install' call
@@ -344,7 +341,7 @@ package() {
 
 	# NOTE: we should only apply ownership and permissions on the final pass!!!
 	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then						# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
-		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"		# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when TYPE=custom (e.g. FXwm)
+		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"		# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when METHOD=custom (e.g. FXwm)
 		for DIR in $NAMES; do
 			for PACK in $TEMP; do
 				[ ! -d "${DIR_DUMP}/${DIR}.${TYPE}" ] && continue		# if a directory is missing then there's no reason to process something that doesn't exist!
@@ -423,16 +420,12 @@ package() {
 			echo "   ${ID} [${PACK}]"
 			echo -e "\n\n   ----- ${ID} ${PACK} -----\n\n" >>"$LOG"
 			eval $SPM_MAKE								# NOTE: we use a variable so any package manager can create a native package for their distro
-			case "$PACK" in								# create the dependency list
-				'all') [ "$DEP_EXEC_ALL" ] && echo -e "$DEP_EXEC_ALL" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'bin') [ "$DEP_EXEC_BIN" ] && echo -e "$DEP_EXEC_BIN" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'dev') [ "$DEP_EXEC_DEV" ] && echo -e "$DEP_EXEC_DEV" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'doc') [ "$DEP_EXEC_DOC" ] && echo -e "$DEP_EXEC_DOC" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'drv') [ "$DEP_EXEC_DRV" ] && echo -e "$DEP_EXEC_DRV" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'gir') [ "$DEP_EXEC_GIR" ] && echo -e "$DEP_EXEC_GIR" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'lib') [ "$DEP_EXEC_LIB" ] && echo -e "$DEP_EXEC_LIB" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-				'loc') [ "$DEP_EXEC_LOC" ] && echo -e "$DEP_EXEC_LOC" | tr ' ' '\n' >"${DIR_REPO}/${ID}${PAK_DEPS}" ;;
-			esac
+
+			( [ "$PACK" = 'all' ] || [ "$PACK" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
+			( [ "$PACK" = 'all' ] || [ "$PACK" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && echo -e "${DEP_EXEC_DEV}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
+			( [ "$PACK" = 'all' ] || [ "$PACK" = 'gir' ] ) && [ "$DEP_EXEC_GIR" ] && echo -e "${DEP_EXEC_GIR}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
+			( [ "$PACK" = 'all' ] || [ "$PACK" = 'lib' ] ) && [ "$DEP_EXEC_LIB" ] && echo -e "${DEP_EXEC_LIB}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
+
 			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
 			[ "$URL_INFO" ] && {							# download the existing information file
 				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
@@ -493,8 +486,7 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo " configurations to tailor the software specifically for your distro."
 	echo
 	echo "  Usage:"
-# VER2 - add in a DIRECTORY value to specify the location for some values (e.g. where the source code is, where the created packages should be stored, etc)
-	echo "	${THIS##*/} [OPTIONS] ACTION NAME"
+	echo "	${THIS##*/} [OPTIONS] ACTION NAME [DIRECTORY]"
 	echo
 	echo "  Actions:"
 	echo "	-b	build a distributable package"
@@ -511,19 +503,15 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	--version	shows the version of this script"
 	echo
 	echo "  Options:"
-	echo "	-A	the CPU architecture to build: ${CPU},all (default)"
+	echo "	-A	the CPU architecture to build: ${CPU},all"
 	echo "	-C	obtain source code from:"
 # DOC NOTE: URL_CODE and GIT_REPO need to go in the config file for the project; URL_INFO and URL_REPO need to be placed in the /etc/builder/config file (with overwrites in the project config file
 	echo "			dev(eloper)|dir(ectory)|git(clone)|(distro)repo"		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'git' is the online git repo to clone from (GIT_REPO in config); this is based on the 'git' and 'clone' values in the .info file	WARN: this requires an existing .info file with certain values!
 	echo "	-D	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
 	echo "	-F	skips packaging until final pass"
 # DOC NOTE: this works in conjunction with the -C (except 'dir'), otherwise, it will use the locations from the builder profile
-	echo "	-I	downloaded the package info file and use its locations"
-	echo "	-N	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
-	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
-	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
-	echo "	-S	package all contents in a single package - do NOT separate"
-	echo "	-T	the compile type to use:"
+	echo "	-I	download the package info file and use its locations"
+	echo "	-M	the compile method to use:"
 	echo "			autoconf"
 	echo "			autogen"
 	echo "			bootstrap"
@@ -531,16 +519,17 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "			custom"
 	echo "			default (configure, make, make install)"
 	echo "			scons"
+	echo "	-N	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
+	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
+	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
+	echo "	-S	package all contents in a single package - do NOT separate"
 	echo "	-U	do not unload compilation packages afterwards"				# this is useful for testing the build profile before it works correctly -OR- just to prevent excessive resource usage when building an entire repo
 	echo
 	echo
 	echo "  Build Software Steps:                             [end user/package creator]"
-# VER2 - instead of steps 2 and 4, those can become the DIRECTORY parameter to steps 3 and 5 respectively
-	echo "	1. builder -d NAME (or download the builder profile manually)"
-	echo "	2. cd /location/of/builder/profile"
-	echo "	3. builder -i NAME.${EXT_BLDR}"
-	echo "	4. cd /package/source/code/directory"
-	echo "	5. builder -{bc} NAME"
+	echo "	1. builder -d NAME [DIRECTORY] (or download the builder profile manually)"
+	echo "	2. builder -i NAME.${EXT_BLDR} /location/of/builder/profile"
+	echo "	3. builder -{bc} NAME /package/source/code/directory"
 	echo "	   NOTES:"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
 	echo "	   - to create a distributable software package, use the -b switch"
@@ -613,7 +602,7 @@ elif [ "$1" = '--version' ]; then
 	exit 0
 else
 	TEMP=0
-	while getopts A:bcC:dDeFiIN:pPrR:St:T:U OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
+	while getopts A:bcC:dDeFiIM:N:pPrR:St:U OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -621,7 +610,7 @@ else
 		fi
 
 		case ${OPTION} in
-			A) ( echo "${OPTARG}" | grep -qE ^"($(echo "${CPU}" | sed 's/,/|/g'))"$ ) || {
+			A) ( echo "${OPTARG}" | grep -qE ^"($(echo "${CPU}" | sed 's/,/|/g')|all)"$ ) || {
 				echo "ERROR: An invalid value for '-A' was passed."
 				exit 1
 			   }
@@ -638,6 +627,7 @@ else
 			F) SKIP='TRUE' ;;
 			i) INSTALL='TRUE' ;;
 			I) INFOFILE='TRUE' ;;
+			M) METHOD="$OPTARG" ;;
 			N) PASS="$OPTARG" ;;
 			p) PROFILE='TRUE' ;;
 			P) PATCH='' ;;
@@ -649,7 +639,6 @@ else
 				exit 1
 			   fi
 			   TEMPLATE="$OPTARG" ;;
-			T) TYPE="$OPTARG" ;;
 			U) UNLOAD='TRUE' ;;
 			*) exit 1 ;;				# NOTE: since 'getopts' presents it own error, we don't need to do so here
 		esac
@@ -660,10 +649,31 @@ else
 
 	# TEST FOR MANDATORY VALUE(S)
 
-	EXE_CMD="${0##*/} $@"					# store the executed command for logging below
-	shift $(expr $OPTIND - 1)				# now that the ACTIONS and OPTIONS have been processed, lets process the package name(s)
-	eval NAME=\${$#}					# store the current last passed value to later check if a directory was passed as the last value	http://stackoverflow.com/questions/1853946/getting-the-last-argument-passed-to-a-shell-script
-	( [ "$NAME" = '' ] || [ "$NAME" = "$0" ] ) && { echo "ERROR: you must provide a name before processing can begin."; exit 1; }		# if a blank value was given -OR- no value given at all (since the 'shift' command will go back to $0)
+	EXE_CMD="${0##*/} $@"									# store the executed command for logging below
+	shift $(expr $OPTIND - 1)								# now that the ACTIONS and OPTIONS have been processed, lets process the package name(s)
+	eval TEMP=\${$#}									# store the current last passed value to later check if a directory was passed as the last value	http://stackoverflow.com/questions/1853946/getting-the-last-argument-passed-to-a-shell-script
+	if [ "$TEMP" != "$0" ] && ( echo "$TEMP" | grep -q '/' ); then				# if a DIRECTORY was passed, then...
+		[ ! -d "$TEMP" ] && { echo "ERROR: The passed directory does not exist (${TEMP})."; exit 1; }					#   if it does NOT exist, then...
+
+		DIRECTORY="$TEMP"								#   store the DIRECTORY value
+
+		TEMP=''
+		for PARAMETER in ${@}; do							#   process each remaining parameter (after the OPTIONS and ACTION have been removed)
+			[ "$PARAMETER" = "$DIRECTORY" ] && break				#   if we have reached the DIRECTORY value, break out of the 'for' loop to NOT include it
+			TEMP="$TEMP $PARAMETER"							#   append each parameter to the list
+		done
+		set -- $TEMP									#   now reset the $@ array (e.g. $1, $2, $3, etc) with the adjusted parameters list
+
+		( echo "$DIRECTORY" | grep -q '/'$ ) && [ "$DIRECTORY" != '/' ] && DIRECTORY="${DIRECTORY%/*}"					#   if the user included a trailing '/' on the passed directory -AND- it wasn't root, then remove it
+		( echo "$DIRECTORY" | grep -q ^'./' ) && DIRECTORY="$(pwd)${DIRECTORY#*.}"	# if a relative directory was passed, adjust the value to be the whole path
+		( echo "$DIRECTORY" | grep -q ^'/' ) || DIRECTORY="$(pwd)/${DIRECTORY}" 
+	fi
+	if [ "$TEMPLATE" ]; then
+		NAME='template'
+	else
+		eval NAME=\${$#}								# store the current last passed value as the package name
+		( [ "$NAME" = '' ] || [ "$NAME" = "$0" ] ) && { echo "ERROR: you must provide a name before processing can begin."; exit 1; }	# if a blank value was given -OR- no value given at all (since the 'shift' command will go back to $0)
+	fi
 fi
 
 
@@ -703,16 +713,18 @@ if [ "$WGET" != '' ]; then
 fi
 
 # set default/uninitialized variable values			  NOTE: we have to set these here since they rely on functions above
-eval LOG="$LOG"
+eval LOG="\"$LOG\""						# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
 
-eval DIR_DUMP="$DIR_DUMP"
-eval DIR_INST="$DIR_INST"
-[ ! "$INSTALL" ] && eval DIR_PROF="${DIR_PROF}/${NAME}"		# if we aren't installing a profile, then append the NAME value to the variable
-eval DIR_REPO="$DIR_REPO"
-eval DIR_TEMP="$DIR_TEMP"
+if [ ! "$TEMPLATE" ]; then
+	eval DIR_DUMP="$DIR_DUMP"
+	eval DIR_INST="$DIR_INST"
+	[ ! "$INSTALL" ] && eval DIR_PROF="${DIR_PROF}/${NAME}"	# if we aren't installing a profile, then append the NAME value to the variable
+	eval DIR_REPO="$DIR_REPO"
+	eval DIR_TEMP="$DIR_TEMP"
 
-eval URL_CODE="$URL_CODE"
-eval URL_INFO="$URL_INFO"
+	eval URL_CODE="$URL_CODE"
+	eval URL_INFO="$URL_INFO"
+fi
 
 [ "$ARCH" = 'a32' ] && EXPORTS="$FLAG_A32"
 [ "$ARCH" = 'a64' ] && EXPORTS="$FLAG_A64"
@@ -741,12 +753,19 @@ fi
 touch "${DIR_REPO}/writable" >/dev/null 2>&1 || { echo "ERROR: The local software repository (DIR_REPO) is not writable."; exit 1; }
 rm "${DIR_REPO}/writable" >/dev/null 2>&1
 
-if [ ! -d "${DIR_TEMP}/${NAME}" ]; then
-	mkdir -p "${DIR_TEMP}/${NAME}" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) does not exist and could not be created."; exit 1; }
+if [ "$TEMPLATE" ]; then					# if we're creating a template, then just check for the temp directory (the other portion is handled below)
+	if [ ! -d "${DIR_TEMP}" ]; then
+		mkdir -p "${DIR_TEMP}" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) does not exist and could not be created."; exit 1; }
+	fi
+	touch "${DIR_TEMP}/writable" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) is not writable."; exit 1; }
+	rm "${DIR_TEMP}/writable" >/dev/null 2>&1
+else								# otherwise let's create the entire temp path
+	if [ ! -d "${DIR_TEMP}/${NAME}" ]; then
+		mkdir -p "${DIR_TEMP}/${NAME}" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) does not exist and could not be created."; exit 1; }
+	fi
+	touch "${DIR_TEMP}/${NAME}/writable" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) is not writable."; exit 1; }
+	rm "${DIR_TEMP}/${NAME}/writable" >/dev/null 2>&1
 fi
-touch "${DIR_TEMP}/${NAME}/writable" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) is not writable."; exit 1; }
-rm "${DIR_TEMP}/${NAME}/writable" >/dev/null 2>&1
-
 
 
 
@@ -759,6 +778,16 @@ if [ ! "$PASS" ] || [ $PASS -eq 1 ]; then
 elif [ "$PASS" ]; then
 	echo -e "\n\n\n\n" >>"$LOG"				# add some breaks between builds if the log already exists
 	echo "------- PASS: ${PASS}  $(date +'%Y-%m-%d %H:%M:%S') -------" >>"$LOG"
+fi
+
+
+
+
+# CHANGE DIRECTORY
+
+if [ "$DIRECTORY" ]; then
+	[ "$TEMPLATE" ] && DIR_TEMP="$DIRECTORY"		# if we're creating a template, then we need to change this variable value so the below code works correctly
+	cd "$DIRECTORY" >/dev/null || exit 1
 fi
 
 
@@ -842,16 +871,17 @@ elif [ "$TEMPLATE" = 'info' ]; then
 	echo "commit:		path/to/commit/abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"			# 	the commit that this package is based on (similar to version)
 	echo "file:		path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"				# files associated with that
 	echo "clone:		.git" >>"${DIR_TEMP}/${NAME}.info"						# to clone a repo locally
-	echo "repo:	http://domain.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"				# linux distro repo url
+	echo "repo:		http://domain.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"				# linux distro repo url
 	echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"					# files associated with that
 	echo "source:		example-1.2.3.${EXT_CODE}" >>"${DIR_TEMP}/${NAME}.info"
 	echo "builder:	example-1.2.3.${EXT_BLDR}" >>"${DIR_TEMP}/${NAME}.info"
 	echo "compile:	example-1.2.3.${EXT_MAKE}" >>"${DIR_TEMP}/${NAME}.info"
 	echo "size:		100K" >>"${DIR_TEMP}/${NAME}.info"
-	echo "category:	system" >>"${DIR_TEMP}/${NAME}.info"
-	echo "interface:	gui	# valid values: cli,gui" >>"${DIR_TEMP}/${NAME}.info"
+# DOC NOTE: multimedia is for consumption (e.g. vlc, mplayer, winamp, pluto tv), productivity is for work (e.g. libre office, blender, gimp), social is for forms of communication (e.g. thunderbird, pidgin, skype, etc), system is for drivers/firmware, services, and compatibility (e.g. samba, ssh, ntfs, sshfs, etc), utilities are for helpful apps (e.g. nmap, curl, winzip, etc)
+	echo "category:	system	# accessibility|development|education|games|multimedia|productivity|social|system|utilities" >>"${DIR_TEMP}/${NAME}.info"
+	echo "interface:	gui	# cli|gui" >>"${DIR_TEMP}/${NAME}.info"
 	echo "toolkit:	gtk2	# [CLI] shell|lua|ruby|php|python|tcl|tk|..., [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"
-	echo "rating:		g" >>"${DIR_TEMP}/${NAME}.info"
+	echo "rating:		g	# g|pg|pg-13|nc-17|r" >>"${DIR_TEMP}/${NAME}.info"
 	echo "license:	LGPLv2.1" >>"${DIR_TEMP}/${NAME}.info"
 	echo "document:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
 	echo "maintainer:	example_maintainer_alias" >>"${DIR_TEMP}/${NAME}.info"
@@ -942,13 +972,14 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "# These can be overwritten via passed values. This file" >>params
 	echo "# can also be deleted to accept default values." >>params
 	echo >>params
-	echo "ARCH='all'" >params
-	echo "DIRS=''" >>params
-	echo "PASS=''" >>params
-	echo "SKIP=''" >>params
-	echo "TRIM=''" >>params
-	echo "TYPE='default'" >>params
-	echo "WGET=''" >>params
+	echo "#ARCH='i64'" >params
+	echo "#DIRS=''" >>params
+	echo "#INFOFILE=''" >>params
+	echo "#PASS=''" >>params
+	echo "#SKIP=''" >>params
+	echo "#TRIM=''" >>params
+	echo "#METHOD='default'" >>params
+	echo "#WGET=''" >>params
 
 	echo "#!/bin/sh" >pre.compile
 	echo "# Specify any pre-compile actions in this script. If there" >>pre.compile
@@ -1026,7 +1057,7 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "#DIR_MARKERS=\"\${DIR_INST}/usr/local/installed\"" >>config
 	echo "#DIR_SCRIPTS=\"\${DIR_INST}/etc/init.d\"" >>config
 	echo >>config
-	echo "# Modify any of the directory configuration locations below" >>config
+	echo "# Uncomment any of the directory configuration locations you wish to modify" >>config
 	echo "#CFG_BIN=\"\${DIR_INST}/bin\"" >>config
 	echo "#CFG_DATA=\"\${DIR_INST}/share\"" >>config
 	echo "#CFG_DATAROOT=\"\${CFG_DATA}\"" >>config
@@ -1057,16 +1088,10 @@ elif [ "$TEMPLATE" = 'profile' ]; then
 	echo "DEP_MAKE_PAK=''" >>config
 	echo >>config
 	echo "# Specify run-time package dependency list for each package type:" >>config
-	echo "# if all compiled files go in a single package, use _ALL below" >>config
-	echo "DEP_EXEC_ALL=''		# all files in a single package instead of splitting below" >>config
 	echo "DEP_EXEC_BIN=''		# only binaries" >>config
 	echo "DEP_EXEC_DEV=''		# ony development files (e.g. *.h headers)" >>config
 	echo "DEP_EXEC_GIR=''		# only gir files" >>config
 	echo "DEP_EXEC_LIB=''		# only libs" >>config
-# REMOVED 2026/02/24 - none of these package types would require dependencies to use
-#	echo "DEP_EXEC_DOC=''		# only documentation" >>config
-#	echo "DEP_EXEC_DRV=''		# only kernel drivers" >>config
-#	echo "DEP_EXEC_LOC=''		# only locale files" >>config
 	echo >>config
 	echo "FLAG_CONF=\"--prefix=\${DIR_INST}\"		# parameters to pass to 'configure'" >>config
 	echo "FLAG_INST=\"DESTDIR=\${DIR_DUMP}/\${NAME}\"		# parameters to pass to 'make install'" >>config
@@ -1114,7 +1139,7 @@ if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then			# if the default (which is all) 
 	done
 	exit 0
 fi
-[ ! "$METHOD" ] && TYPE='default'
+[ ! "$METHOD" ] && METHOD='default'
 
 
 

@@ -126,3 +126,15 @@
 - Updated the CFG_LIBEXEC value
 - Continued creating the man page
 
+2026/02/25
+- Removed DEP_EXEC_ALL
+- Updated a bug with passing '-A all'
+- Updated the -A option to default to 'i64'
+- Updated more instances of TYPE to METHOD
+- Moved the -T to -M option
+- Added INFOFILE to the params template
+- Added DIRECTORY to the parameters
+- Updated the directory structure
+- Continued creating the man page
+- Updated the --help output
+
