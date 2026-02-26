@@ -134,7 +134,22 @@
 - Moved the -T to -M option
 - Added INFOFILE to the params template
 - Added DIRECTORY to the parameters
+- Updated a processing bug with the LOG value using a dash
 - Updated the directory structure
+- Updated the 'package' script
+- Continued creating the man page
+- Updated the --help output
+
+2026/02/26
+- Added '-t all'
+- Updated so that -d and -i can be chained together
+- Removed the preceeding '.' from the EXT_ variables
+- Added the 'z' switch to the tar profile extraction call
+- Updated code to eval the default EXT_ variables
+- Updated the DIRECTORY processing when -p is used
+- Consolidated code in the source code fetching section
+- Added checks for values in the source code fetching section
+- Added MIPS, PowerPC, and RISC-V architectures
 - Continued creating the man page
 - Updated the --help output
 

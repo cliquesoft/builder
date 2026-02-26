@@ -605,14 +605,14 @@ template for any project. Otherwise, the NAME is used to identify which
 directory to enter, which builder profile to use, etc. There are also
 OPTIONS that can be used to modify execution behavior.
 
-The last parameter builder can accept is DIRECTORY. Typically it operates
-as the target location for the passed action, and is optional. To provide
-flexibility for the user, there are several different syntaxes that are
-permitted. Both full and relative paths are permissible, but the value
-must contain a forward slash (/) to indicate it's a directory instead of a
-package name. This will not be a problem with full paths as they obviously
-start with one. Relative paths can either begin with a './', end with a
-'/', or contain a slash within the value (e.g. 'some/dir').
+The last parameter builder can accept is DIRECTORY. It operates as the
+location for the passed action, and is optional. To provide flexibility
+for the user, there are several different syntaxes that are permitted.
+Both full and relative paths are permissible, but the value must contain
+a forward slash (/) to indicate it's a directory instead of a package
+name. This will not be a problem with full paths as they obviously start
+with one. Relative paths can either begin with a './', end with a '/',
+or contain a slash within the value (e.g. 'some/dir').
 
 To summarize, the DIRECTORY value can be:
   o A full path: /dir/builder/
@@ -635,174 +635,87 @@ Shows helpful information about the program
 .B --version
 Displays the software version and exits.
 
+.B -b
+The action that will most likely be used, this one builds one or more
+distributable packages from source code. This action is aimed at the
+package maintainers for Linux distros. If DIRECTORY is passed, that will
+be the location used to process the source code.
+
 .B -c
-Users can simply use a graphical file manager, or the 'cp' command at a
-shell prompt to copy files. However, this would require manually tracing
-dependency trees to copy all the necessary packages required to make a
-program work correctly. This action reduces all that work into a single,
-convenient command. If no PACKAGE(S) value is passed, then all packages
-in the DIR_OPTION (or -S location) will be processed.
+Like the prior action, this one also builds software from its source code.
+However, no packages are created. This action simply compiles and installs
+the project into the system, and is targeted towards anyone that wants to
+build a system from scratch using only source code. If DIRECTORY is used,
+that will be the location used to process the source code.
 
 .B -d
-There may be times when a package just needs to be downloaded so it can
-be processed in the future. This could include network update servers,
-software testing, or even pre-installed ondemand software for (device)
-deployment scenarios. Using this action allows the packages to be
-obtained before they are required.
-
-.B -e
-Similar to the -d ACTION, this switch will extract the contents of one or
-more packages to a specified location. This can be useful in situations
-where packages need to be (forensically) compared, imaging devices, or any
-other situation requiring the extraction of package files. Without passing
-a PACKAGE(S) value, all packages in the DIR_OPTION (or -S location) will
-be processed.
-
-It is important to note that this action will always overwrite data due to
-the underlying binary being used.
-
-.B -f FILES
-While not a routine task, there may be times when it is useful to find the
-package that a particular file belongs to. This action will allow you to
-enter one or more files and search which local packages contains them.
+Before builder can process a projects source code, it needs to acquire its
+profile first. This action will instruct builder to download the file to
+your device using the Linux distro repository defined with the URL_REPO
+value in the global config file. While it's not possible to chain ACTIONS,
+there is an exception for this one and '-i' so the two can be combined
+into a single call. The DIRECTORY value will indicate the location that
+the profile will be downloaded into.
 
 .B -i
-The cornerstone of all packages managers, this switch performs the actual
-installation of packages so that users don't have to find, compile, and
-install software themselves. The packages, or dependencies, can be local
-or remote. If no PACKAGE(S) value is passed, then all packages in the
-DIR_OPTION (or -S location) will be processed.
-If speed is a necessity, and all packages and their dependencies are in
-source directory, a '-D none' switch can be included to skip that check.
+If you already obtained a builder profile from a non-distro repo source,
+then you can use this action to install it. As mentioned above, this can
+also be chained with the '-d' action in a single command to execute both
+tasks just one call. The DIRECTORY parameter will be used as the source
+location storing the builder profile.
 
-.B -l
-To list the packages currently installed, use this switch. Currently the
-output uses a verbose 2 line per package layout containing a plethora of
-information about each package - provided the .info files are also present
-in the DIR_INST directory. Users can pass specific packages to list, or
-process all installed software without a PACKAGE(S) value.
-NOTE: There are plans to reduce this to one line in a future version.
+.B -p
+After you have created a builder profile template and filled it out, you
+can use this action to create a single file for distribution. Ideally the
+software author would create a generic profile to make it easier for
+package maintainers for the various Linux distros to quickly modify to fit
+their own environment. An alternative location can be specified to package
+using the DIRECTORY parameter, otherwise a directory matching the NAME
+value in the current location will be used.
 
-.B -m NAME DIRECTORY
-This switch can be used to create a package file for distribution and will
-bundle all the files in a passed directory. With the presence of a .make
-file, pax will execute it to compile software before the packaging phase
-takes place. This will enable package maintainers to include their .make
-file alongside the packaged software so anyone can easily build from
-source.
+.B -r
+While not a routine task, there may be times when it is useful to update a
+package with alternative or additional files, without having to recompile
+everything. This would most likely be used between distros that are forks
+of others and have slight modifications. Use the DIRECTORY parameter to
+indicate the location to re-package, otherwise a directory matching the
+NAME value in the current location will be used.
 
-Unlike other switches, this one can only process one package at a time,
-with the PACKAGE(S) value being used as the name of the created package.
-This value can still be given in a text file, but only one name can be
-included per execution. The other mandatory value is a DIRECTORY (or -S)
-value to indicate the location of the files/source code to process.
-
-If no .make file is present, then the passed directory will be considered
-the root level for the package being created. If a .make file does exist,
-then it needs to be named using the FILE_SCHEMA syntax with a .make file
-extension, and placed directly inside the passed directory. Likewise, the
-source code directory needs to be in the same location. Its name, however,
-if of no value to pax since that will be handled by the .make script. The
-compile process must install the created software into a staging directory
-named 'project'. The layout should look like:
-   /tmp/staging/
-           PACKAGE.make
-           PACKAGE-source-code-dir/
-           project/
-
-.B -o [NAME] [clear]
-While there is not a package server manager yet, this switch will be used
-by client devices to enable remote administration of packages. This will
-be accomplished by using a value similar to:
-   FIFO_SERVER='/sshfs/directory/device_NIC_MAC'
-to enable network admins to remotely manage packages installed on devices
-under their control, including the (un)installation, updating, and repair
-of any software.
-
-To give the fifo a different name, you can either modify the FIFO_SERVER
-value in the config file, or pass a new name as a value to the -o switch.
-In the event that a fifo was left behind due to some type of error, a
-cleanup can be made by passing a trailing 'clear' to the pax command.
 
 .B -t VALUE
-Sometimes it is helpful to see dependency trees to packages. This switch
-offers two different modes to show you this information. Using a value of
-'relies' will display the dependencies that the passed package(s) rely on.
-Contrarily, a value of 'reliant' will show all the packages that rely on
-the ones passed.
-
-.B -u VALUE
-This action offers a range of uninstallation modes to handle your needs.
-The first mode, 'unload', simply uninstalls the software files from your
-device, leaving behind the config and package files for a quick reinstall.
-The 'unlist' value performs the same tasks as 'unload', but additionally
-removes the package from the LIST_LIVE (or -L list). If the software will
-no longer be used, passing a 'delete' command will unlist and delete the
-associated package files, leaving the configs untouched. To remove even
-the package config files, use a 'purge' value to completely remove all
-traces of the software from the device. Keep in mind that none of these
-commands affect any data generated by the software, only the software
-itself.
-
-The last mode, is 'update', and as the name implies it's for updating
-currently installed software to a new version. Unless overwritten, a
-restore point is generated for the old version before the new one gets
-installed. When performing this action, you need to be in the directory
-containing the update so that the -S and DIRECTORY values can operate
-as designed (the former being where the existing package file is located
-and the latter being the path were the package is installed to).
-
-To summarize:
-  o 'unload' - removes application files
-  o 'unlist' - unloads and removes LIST_LIVE (or -L) entry
-  o 'delete' - unlists and removes package files
-  o 'purge'  - deletes and removes config files
-  o 'update' - unloads current version, installs new version
-
-.B -v VALUE
-There may be times when validating package data is necessary, especially
-if software is malfunctioning. This action will enable you to validate the
-package dependencies are installed by issuing a 'deps' value. It can also
-validate that the files in a package are installed, have the appropriate
-ownership/permissions, and either symlinked to the correct target, or that
-each installed file is legitimate. Both tasks can be accomplished with a
-'data' value, however, using 'hash' will extend validation of each copied
-(not symlinked) file via hashes instead of the quicker comparison using
-file sizes. The latter mode will take a bit longer to complete. If any
-issues are found, you can use a 'fix' value to resolve them.
-
-.B -z
-This action is only useful when pax is installed in a distro using several
-package managers, but it's not configured as the exclusive default. This
-switch will sync the necessary cache files so that it can operate properly
-in the OS. Even with this switch, alternating between various managers is
-highly discouraged outside of testing environments.
-
-If there are packages whose contents are installed some place other than
-root, home, or DIR_LIVE, and have no installation marker, then make sure
-to enter the root-level directory containing those files before executing
-this action so that the packages can be properly processed.
+Use this action to create a builder profile template. This maintains a
+uniform layout, and makes it easier to know what to configure and include.
+There are three values that can be used to create different parts of the
+entire template. Passing 'info' will simply generate a sample .info file,
+whereas 'profile' will create an example builder profile. To make both of
+these in a single call, pass the 'all' value. By default this places the
+files in a 'template' directory under DIR_TEMP, but can be changed using
+the DIRECTORY parameter.
 
 
 
 
 .SH OPTIONS
-To adjust the behavior of actions, you can pass one or more options with
-each execution of pax. Remember that these actually need to proceed the
-action switch!
+To adjust the behavior of actions, you can pass one or more options when
+executing builder. Remember that these actually need to proceed the action
+switch!
 
-.B -B
-Used to indicate the device is booting so that packages can be processed
-as configured using either a single or dual-phase installation. This also
-sets DIRECTORY='/' and checks only REPO_SYSTEM. Users should never pass
-this flag in a live environment.
+.B -A VALUE
+Specifies an alternative CPU architecture to process. This could be useful
+for mixed 32/64 bit environments, or for building software for a different
+target device. Presently the supported processors (both 32 and 64bit) are
+ARM, Intel/AMD, MIPS, PowerPC, Raspberry Pi (also ARM), RISC-V. Contact
+our staff to add others in future updates.
 
 .B -C VALUE
-Specifies an alternative CPU architecture to process. This could be useful
-for mixed 32/64 bit environments, or for building the OS for a different
-target device.
+This switch identifies where the source code for the software should be
+obtained from (unless it was already downloaded manually). There are
+multiple supported locations to make sure at least one is available. The
+first is 'dev' and belongs to the official software author
 
-.B -D VALUE
+		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'git' is the online git repo to clone from (GIT_REPO in config); this is based on the 'git' and 'clone' values in the .info file	WARN: this requires an existing .info file with certain values!
+ 
+
 This switch controls how dependencies are processed. A value of 'none'
 will prevent this step and affect only the packages pax is instructed to
 process via a list, file, or directory. The 'default' value is the normal
@@ -818,6 +731,12 @@ To list packages as optional in the .deps file, use the following syntax:
 
 Unless '-D none' is used, the search order for dependencies is:
    REPO_SOURCE (-S), REPO_OPTION, REPO_SYSTEM, [REPO_SCHEMA]
+
+.B -B
+Used to indicate the device is booting so that packages can be processed
+as configured using either a single or dual-phase installation. This also
+sets DIRECTORY='/' and checks only REPO_SYSTEM. Users should never pass
+this flag in a live environment.
 
 .B -E VALUE[,VALUE,...]
 In some cases a user might want more than the package files necessary
