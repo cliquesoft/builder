@@ -677,9 +677,11 @@ value in the current location will be used.
 While not a routine task, there may be times when it is useful to update a
 package with alternative or additional files, without having to recompile
 everything. This would most likely be used between distros that are forks
-of others and have slight modifications. Use the DIRECTORY parameter to
-indicate the location to re-package, otherwise a directory matching the
-NAME value in the current location will be used.
+of others and have slight modifications. You may also find this useful if
+package separation is desired (e.g. binaries, libraries, documentation).
+Use the DIRECTORY parameter to indicate the location to re-package,
+otherwise a directory matching the NAME value in the current location will
+be used.
 
 
 .B -t VALUE
@@ -703,89 +705,109 @@ switch!
 .B -A VALUE
 Specifies an alternative CPU architecture to process. This could be useful
 for mixed 32/64 bit environments, or for building software for a different
-target device. Presently the supported processors (both 32 and 64bit) are
+target device. Presently the supported processors (both 32 and 64bit) are:
 ARM, Intel/AMD, MIPS, PowerPC, Raspberry Pi (also ARM), RISC-V. Contact
 our staff to add others in future updates.
 
 .B -C VALUE
 This switch identifies where the source code for the software should be
 obtained from (unless it was already downloaded manually). There are
-multiple supported locations to make sure at least one is available. The
-first is 'dev' and belongs to the official software author
+multiple supported locations to make sure at least one is available. None
+are mandatory, but at least one should be listed so builder can perform
+this step for the user if they invoke this switch.
 
-		# 'dev' is the official software manufacturer (URL_CODE in config); 'dir' is a local directory (DIR_REPO in config); 'repo' is the distro repo URL (URL_REPO in config); 'git' is the online git repo to clone from (GIT_REPO in config); this is based on the 'git' and 'clone' values in the .info file	WARN: this requires an existing .info file with certain values!
- 
+The first value is 'dev' and belongs to the official software author. This
+would typically be their homepage download link but it can be any official
+location containing their source code in the absense of a website. The two
+values used in the .info file are 'homepage' and 'download', which will be
+appended to one another.
 
-This switch controls how dependencies are processed. A value of 'none'
-will prevent this step and affect only the packages pax is instructed to
-process via a list, file, or directory. The 'default' value is the normal
-mode of operation and will process dependencies. Some packages have
-optional dependencies (e.g. documentation) that will also be processed by
-using 'all' as the value. There is an additional mode, 'source', which
-will work like 'default', but mandates that all the dependencies reside
-in the passed -S location. It is impossible to combine the functionality
-of 'all' and 'source' - at least presently.
+The next value is 'dir' and can be used if you already have an existing
+copy of the source code. It needs to be a compressed file (tbz, tgz, zip)
+and placed in one of two locations, DIR_REPO or DIR_REPO/NAME with the
+filename the same as the NAME value passed along with one of the listed
+extensions previously mentioned.
 
-To list packages as optional in the .deps file, use the following syntax:
-   [OPTIONAL.EXT_SOFT|INSTALLLED.EXT_SOFT]
+The third value is 'git', which can pull the source code down from an the
+online git repo specified in the .info file. Since this uses git, make
+sure that it is installed before running builder with this value. There
+are actually three values that can be used from the .info file: git, file,
+and clone. The latter two are appended to the 'git' URL, so either or both
+can be specified for flexibility (with the 'file' taking precedence).
 
-Unless '-D none' is used, the search order for dependencies is:
-   REPO_SOURCE (-S), REPO_OPTION, REPO_SYSTEM, [REPO_SCHEMA]
+The final value for this variable is 'repo'. This location utilizes the
+URL of your Linux distro repo to obtain the source code. The two values
+used in the .info file are 'repo' and 'source'. Like the others, they are
+combined to produce the entire URL to acquire the proper file.
 
-.B -B
-Used to indicate the device is booting so that packages can be processed
-as configured using either a single or dual-phase installation. This also
-sets DIRECTORY='/' and checks only REPO_SYSTEM. Users should never pass
-this flag in a live environment.
+To summarize, the VALUE can be:
+  dev  [URL_CODE]: the software authors official download link
+  dir  [DIR_REPO]: a directory containing existing source code
+  git  [GIT_REPO]: an online git repository containing the code
+  repo [URL_REPO]: the Linux distro repo URL storing the code
 
-.B -E VALUE[,VALUE,...]
-In some cases a user might want more than the package files necessary
-for an installation. For example, they may want a .make file to build
-the package from source, or the .cpio file to include as part of the
-base OS. Even downloading the .info file will provide extra package
-info when using the -l action. Possible values include:
-   all  - download all additional package files
-   code - package source code
-   cpio - initial ramdisk inclusion file
-   info - package information
-   list - package manifest listing
-   make - package compile script
+.B -D
+Most of the time the passed NAME parameter is used to name the package,
+however, there are some software that multiple packages get created from.
+An example is php, which can sometimes get separated into: php, php-cli,
+php-fpm, etc. In this situation, the -D switch provides the mechanism to
+use alternative names when creating the packages. To use this method, a
+post.compile[.#] script will need to create and move the appropriate files
+into each directory. Be aware that the individual package separation will
+still take place and generate packages like php-cli-doc, php-cli-lib, etc,
+so make sure to place all the proper files into each directory. If there
+is a builder profile installed, you should not use this option without any
+modifications to the post.compile[.#] script mentioned above.
 
 .B -F
-Be careful with the inclusion of this option as it will force the action
-to take place, even if dire consequences result!
+When creating packages, more often than not, the packaging should be done
+at the end of the (final) pass. There may be a rare exception to this rule
+and this step should take place beforehand. Issuing this option will make
+the making process occur before the final pass. Although this probably
+would not occur, there may be undesired results if this switch is used
+when -N is greater than 2. If there is such an instance, reach out to our
+staff to resolve this matter. Do not use this option if a builder profile
+is installed, without making modifications to it.
 
-.B -I VALUE[,VALUE,...]
-In rare cases, there may be a need to ignore a dependency from getting
-processed. For example, there may be a dependency that is still desired
-to retain after another program that relies on it has been uninstalled.
-Instead of adding a package to a flag file, this value can be passed
-during the execution of pax.
-
-.B -K VALUE
-During normal operation, this flag would never be used since it changes
-the kernel string attached to driver packages. However, if a kernel update
-or an OS build for another device were required, this switch would become
-useful.
-
-.B -L VALUE
-When installing a package, the default process adds the package to the
-LIST_LIVE list. This can be foregone with a value of 'none', or placed
-in the LIST_BOOT with a 'boot' value.
+.B -I
+The .info file contains a plethora of information. This option works in
+conjunction with '-C' to find the source code for the software, with the
+only exception being '-C dir' (which uses DIR_REPO). If this option is
+not passed, then the necessary information is gathered from the builder
+profile of the software itself. This switch is defined with the URL_INFO
+value in the global config file.
 
 .B -M VALUE
-Sets the mode for the installation of the package contents. The only two
-values are 'copy' and 'link', with the latter referring to maintaining a
-loopback mount to the package and symlinking its contents into the OS.
-There are several advantages with this method including conservation of
-storage space and the inability to manipulate a readonly file system.
-This doesn't mean malicious activity can't take place, since symlinks can
-be redirected, or replaced with an actual binary. But it does add some
-more barriers.
+To help make it easier in building a profile, several common methods of
+compiling have been added, which include: autoconf, autogen, bootstrap,
+cmake, default (configure, make, make install), and scons. To provide
+flexibility to the developer, there is one other option that is aptly
+named 'custom'. Using that value will require all the calls necessary to
+compile the software stored in the CUSTOM variable of the profile. To use
+this option without a builder profile, you will need to export the
+variable before making the call to builder:
+   export CUSTOM='step 1; step 2; ...'; builder ...
+Do not use this option if a builder profile is installed, without making
+modifications to it.
 
-If speed of operation is your primary goal, then you would want to use
-the 'copy' value here, which is the default. If the OS uses a ramdisk,
-then the speed is even greater than with attached storage.
+.B -N VALUE
+Some software require more than one pass to compile. In that instance you
+can pass this option along with a number for its value to indicate how
+many passes should be performed. It's important to note that when using
+this switch, all the profile files (and directories) will need to have a
+number appended to them to designate which pass they need to be applied
+(e.g. config will need to become config.1, config.2, etc). Do not use this
+option if a builder profile is installed.
+
+.B -P
+There may be instances when you want to compile software without including
+any accompanying patches. For instance, some Linux distros occasionally
+create patches to meet certain needs or requirements for their working
+environment. This switch will prevent all of them from being applied
+during the compilation process. To perform this action, the patches will
+obviously need to be included in the 'patches[.#]' directory of the
+builder profile.
+
 
 .B -N VALUE[,VALUE,...]
 For instances where storage space is at a premium, security is critical

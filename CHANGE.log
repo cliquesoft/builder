@@ -153,3 +153,11 @@
 - Continued creating the man page
 - Updated the --help output
 
+2026/03/03
+- Added an anchor to the -C .info processing
+- Added 'file:' processing to '-C git'
+- Negated the -F option
+- Updated the references of -T to -M
+- Continued creating the man page
+- Updated the --help output
+

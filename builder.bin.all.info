@@ -48,7 +48,7 @@ comments:	This project is suitable for end users, developers, and package
 		added. Patches or donations are welcome and will expedite
 		future updates. Features include:
 		- Added output options: 'json', 'html', 'xml'
-		- A DIRECTORY parameter for flexibility
+		- Sync new source code across all public spaces
 		- A graphical interface
 		- Automated package checking/downloading/updating
 		- Ability to process .deb (and other) package types

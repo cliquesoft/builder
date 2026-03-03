@@ -136,8 +136,8 @@ export ARCH='i64'						# the current CPU architecture being compiled (e.g. i32, 
 DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
 INFOFILE=''							# stores the info file to download/use to obtain the software
 export PASS=''							# the number of passes to make during compile (blank disables)
-PATCH=TRUE							# indicates we need to apply patches to the source code
-SKIP=''								# indicates we need to skip packaging until the final pass
+PATCH='TRUE'							# indicates we need to apply patches to the source code
+SKIP='TRUE'							# indicates we need to skip packaging until the final pass (blank doesn't wait)
 SINGLE=''							# indicates all files need to be placed in a single package
 TRIM=''								# any part of the name to remove when building the package
 METHOD='default'						# the method of compile being performed (e.g. autogen, bootstrap, ...)
@@ -379,9 +379,11 @@ package() {
 
 	# CREATE EACH PACKAGE
 
-	if [ ! "$SKIP" ] || ( [ "$SKIP" ] && [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# if '-F' wasn't passed -OR- it was -and- we are on the last pass, then exit this function
-		return 0
-	fi
+# 2026/03/03 - the -F was turned into a negation
+#	if [ ! "$SKIP" ] || ( [ "$SKIP" ] && [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# if '-F' wasn't passed -OR- it was -and- we are on the last pass, then exit this function
+#		return 0
+#	fi
+	[ ! "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && return 0				# if '-F' was passed -AND- '-N' was passed -AND- we are on the last pass, then exit this function
 
 	cd "${DIR_DUMP}" 2>>"$LOG" || {								# change into the temp packaging directory
 		echo "Calling: cd \"$DIR_DUMP\"" >>"$LOG"
@@ -498,9 +500,11 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	-b	build a distributable package"
 	echo "	-c	compile the software only, no packaging"
 	echo "	-d	download the builder profile (uses URL_REPO)"
-	echo "	-i	install the builder profile"						# installs the builder profile in /etc/builder so it can be used
+	echo "	-i	install the builder profile"
 	echo "	-p	create a builder profile"
-	echo "	-r	only re-package software instead of building"				# this will be useful if something in 'DIR_PROF/include' gets updated (e.g. added a .desktop file); this can also sort a single package into multiple (e.g. bin, doc, lib, etc)
+	echo "	-r	only re-package software instead of building"
+# VER2 - for every -C value that's filled out, this can sync the software with each of those sources with a single command
+#	echo "	-s	sync source code to all configured locations"
 	echo "	-t	create a package template: all, info, profile"
 # VER2 - check for updates to software via git or website; also allow this to be setup via cron to automatically check
 #	if the (homepage) link is not present (since it would change to a different filename), there's an update
@@ -513,10 +517,10 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	-A	the CPU architecture to build:"
 	echo "			${CPU},all"
 	echo "	-C	obtain source code from:"
+# VER2 - add a 'sync' option that uses rsync
 	echo "			dev(eloper)|dir(ectory)|git(clone)|(distro)repo"
-	echo "	-D	package using directories in DIR_DUMP instead of NAME value"		# this is useful if a pre/post script creates multiple packages from a single compile (e.g. php, php-cli, php-fpm, etc)
-	echo "	-F	skips packaging until final pass"
-# DOC NOTE: this works in conjunction with the -C (except 'dir'), otherwise, it will use the locations from the builder profile
+	echo "	-D	package using directories in DIR_DUMP instead of NAME value"
+	echo "	-F	does NOT wait until the final pass to package files"
 	echo "	-I	download the package info file and use its locations"
 	echo "	-M	the compile method to use:"
 	echo "			autoconf"
@@ -526,8 +530,8 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "			custom"
 	echo "			default (configure, make, make install)"
 	echo "			scons"
-	echo "	-N	the number of passes to make when compiling"				# NOTE: this can use per-pass files (e.g. pre.1, pre.2, config.1, etc)
-	echo "	-P	prevent patching from occurring"					# this will prevent the patching stage if the patches have already been applied to the source code
+	echo "	-N	the number of passes to make when compiling"
+	echo "	-P	prevent patching from occurring"
 	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
 	echo "	-S	package all contents in a single package - do NOT separate"
 	echo "	-U	do not unload compilation packages afterwards"				# this is useful for testing the build profile before it works correctly -OR- just to prevent excessive resource usage when building an entire repo
@@ -632,7 +636,7 @@ else
 			   WGET="$OPTARG" ;;
 			d) DOWNLOAD='TRUE' ;;
 			D) DIRS='TRUE' ;;
-			F) SKIP='TRUE' ;;
+			F) SKIP='' ;;
 			i) INSTALL='TRUE' ;;
 			I) INFOFILE='TRUE' ;;
 			M) METHOD="$OPTARG" ;;
@@ -703,7 +707,9 @@ TEMP=0
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
 
 # option checking
-[ "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
+# UPDATED 2026/03/03 - the -F was turned into a negation
+#[ "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
+[ ! "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
 if [ "$WGET" != '' ]; then
 	TEMP=''
 	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'git' ] && [ ! "$GIT_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) ) && {
@@ -723,6 +729,7 @@ if [ "$WGET" != '' ]; then
 fi
 
 # set default/uninitialized variable values			  NOTE: we have to set these here since they rely on functions above
+[ ! "$METHOD" ] && METHOD='default'
 eval LOG="\"$LOG\""						# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
 
 if [ ! "$TEMPLATE" ]; then
@@ -749,8 +756,14 @@ fi
 [ "$ARCH" = 'a64' ] && EXPORTS="$FLAG_A64"
 [ "$ARCH" = 'i32' ] && EXPORTS="$FLAG_I32"
 [ "$ARCH" = 'i64' ] && EXPORTS="$FLAG_I64"
+[ "$ARCH" = 'm32' ] && EXPORTS="$FLAG_M32"
+[ "$ARCH" = 'm64' ] && EXPORTS="$FLAG_M64"
+[ "$ARCH" = 'p32' ] && EXPORTS="$FLAG_P32"
+[ "$ARCH" = 'p64' ] && EXPORTS="$FLAG_P64"
 [ "$ARCH" = 'r32' ] && EXPORTS="$FLAG_R32"
 [ "$ARCH" = 'r64' ] && EXPORTS="$FLAG_R64"
+[ "$ARCH" = 'v32' ] && EXPORTS="$FLAG_V32"
+[ "$ARCH" = 'v64' ] && EXPORTS="$FLAG_V64"
 
 
 # check the directories						  NOTE: we can't write to a log yet since those checks are occurring
@@ -902,10 +915,12 @@ elif [ "$TEMPLATE" ]; then
 		echo "builder:	example-1.2.3.${EXT_BLDR}" >>"${DIR_TEMP}/${NAME}.info"
 		echo "compile:	example-1.2.3.${EXT_MAKE}" >>"${DIR_TEMP}/${NAME}.info"
 		echo "size:		100K" >>"${DIR_TEMP}/${NAME}.info"
-# DOC NOTE: multimedia is for consumption (e.g. vlc, mplayer, winamp, pluto tv), productivity is for work (e.g. libre office, blender, gimp), social is for forms of communication (e.g. thunderbird, pidgin, skype, etc), system is for drivers/firmware, services, and compatibility (e.g. samba, ssh, ntfs, sshfs, etc), utilities are for helpful apps (e.g. nmap, curl, winzip, etc)
-		echo "category:	system	# accessibility|development|education|games|multimedia|productivity|social|system|utilities" >>"${DIR_TEMP}/${NAME}.info"
+# DOC NOTE: multimedia is for playback (e.g. vlc, mplayer, winamp, pluto tv, netflix), productivity is for work (e.g. libre office, blender, gimp, hypertext), social is for forms of communication (e.g. thunderbird, pidgin, skype, etc), system is for drivers/firmware, services, and compatibility (e.g. samba, ssh, ntfs, sshfs, etc), utilities are for helpful apps (e.g. nmap, curl, winzip, etc)
+# Development was merged into Productivity
+# Accessibility was merged into System
+		echo "category:	system	# education|games|multimedia|productivity|social|system|utilities" >>"${DIR_TEMP}/${NAME}.info"
 		echo "interface:	gui	# cli|gui" >>"${DIR_TEMP}/${NAME}.info"
-		echo "toolkit:	gtk2	# [CLI] shell|lua|ruby|php|python|tcl|tk|..., [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"
+		echo "toolkit:	gtk2	# [CLI] shell|lua|ruby|php|python|tcl|tk|...  [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"
 		echo "rating:		g	# g|pg|pg-13|nc-17|r" >>"${DIR_TEMP}/${NAME}.info"
 		echo "license:	LGPLv2.1" >>"${DIR_TEMP}/${NAME}.info"
 		echo "document:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
@@ -1002,7 +1017,7 @@ elif [ "$TEMPLATE" ]; then
 		echo "#DIRS=''" >>params
 		echo "#INFOFILE=''" >>params
 		echo "#PASS=''" >>params
-		echo "#SKIP=''" >>params
+		echo "#SKIP='TRUE'" >>params
 		echo "#TRIM=''" >>params
 		echo "#METHOD='default'" >>params
 		echo "#WGET=''" >>params
@@ -1158,7 +1173,7 @@ fi
 if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then			# if the default (which is all) or a specified 'all' was passed, then...
 	# cycle each defined CPU architecture and compile
 	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do		# call this script again for all supported CPU architecture and exit
-		TEMP='"$THIS" -A "$ARCH" -T "$METHOD"'
+		TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
 		[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 		[ "$DIRS" ] && TEMP="$TEMP -D"
 		[ "$PASS" ] && TEMP="$TEMP -N '$PASS'"
@@ -1172,7 +1187,6 @@ if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then			# if the default (which is all) 
 	done
 	exit 0
 fi
-[ ! "$METHOD" ] && METHOD='default'
 
 
 
@@ -1299,13 +1313,14 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 
 		# now set the variable values for the below code blocks
 		if [ "$WGET" = 'dev' ]; then
-			URL_CODE="$(grep -i -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			URL_CODE="$(grep -i -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$URL_CODE" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		elif [ "$WGET" = 'git' ]; then
-			GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			GIT_REPO="$(grep -i -e ^'git:' -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			[ ! "$GIT_REPO" ] && GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$GIT_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		elif [ "$WGET" = 'repo' ]; then
-			URL_REPO="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			URL_REPO="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$URL_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		fi
 	fi
@@ -1337,9 +1352,15 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		eval wget "$TEMP" 2>>"$LOG" || stop failed
 	}
 	[ "$WGET" = 'git' ] && {
-		TEMP="$(echo "$GIT_REPO" | sed "s/\${NAME}/$TEMP/g")"
-		eval echo "Calling: git clone \"$TEMP\"" >>"$LOG"
-		eval git clone "$TEMP" 2>>"$LOG" || stop failed
+		if ( echo "$GIT_REPO" | grep -qE '(tgz|zip)'$ ); then				# if the git link is a distributable file, then...
+			eval echo "Calling: wget \"$GIT_REPO\"" >>"$LOG"
+			eval wget "$GIT_REPO" 2>>"$LOG" || stop failed				#   download it
+			WGET='git2'								#   temporarily change the value so the below uncompression code can run
+		else										# otherwise, we have a git repo to clone, so...
+			TEMP="$(echo "$GIT_REPO" | sed "s/\${NAME}/$TEMP/g")"
+			eval echo "Calling: git clone \"$TEMP\"" >>"$LOG"
+			eval git clone "$TEMP" 2>>"$LOG" || stop failed				#   clone it!
+		fi
 	}
 	[ "$WGET" = 'repo' ] && {
 		TEMP="$(echo "$URL_REPO" | sed "s/\${NAME}/$TEMP/g")"
@@ -1358,6 +1379,7 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 				tar -xf "${TEMP%.*}" 2>>"$LOG"
 				;;
 		esac
+		[ "$WGET" = 'git2' ] && WGET='git'						#    if the value had been temporarily changed above, we now need to change it back
 	fi
 	echo -e "Detected:\n$(ls -tdpr -- * | grep '/'$)" >>"$LOG"
 	echo "Calling: cd \"$(ls -tdr -- * | grep '/'$ | head -1)\"" >>"$LOG"
@@ -1643,7 +1665,7 @@ fi
 [ "$PASS" ] && {
 	echo -e "\nStarting the next pass..." | tee -a "$LOG"
 
-	TEMP='"$THIS" -A "$ARCH" -T "$METHOD"'
+	TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
 	[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 	[ "$DIRS" ] && TEMP="$TEMP -D"
 	#[ "$PASS" ] && TEMP="$TEMP -N '$PASS'"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
