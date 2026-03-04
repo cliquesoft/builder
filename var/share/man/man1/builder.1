@@ -1,5 +1,5 @@
 .\"Man page for builder, by Dave Henderson.
-.TH pax 1 "2026 February 04"
+.TH builder 1 "2026 March 4"
 .SH NAME
 \fIbuilder\fR - package builder
 
@@ -7,6 +7,7 @@
 
 
 .SH SYNOPSIS
+
 .B builder [OPTIONS] ACTION NAME
 
 ACTIONS:
@@ -46,20 +47,23 @@ OPTIONS:
 
 
 .SH TOC
+
 1.  DESCRIPTION
 2.  CONFIGS
 3.  PARAMETERS
 4.  ACTIONS
 5.  OPTIONS
-6.  EXAMPLES
-7.  BUGS
-8.  COPYRIGHT
-9.  AUTHORS
+6.  INFO FILE
+7.  EXAMPLES
+8.  BUGS
+9.  COPYRIGHT
+10. AUTHORS
 
 
 
 
 .SH DESCRIPTION
+
 .I builder
 was created to not only make it easier to compile software, but to also
 enable a quick way to distribute the means of doing so. Imagine having a
@@ -106,6 +110,7 @@ from their website.
 
 
 .SH CONFIGS
+
 There are several configuration files that are used with builder. The main
 file is used to define global variable and default profile values, and is
 typically located in '/etc/builder'. To provide flexibility, there are
@@ -598,6 +603,7 @@ desired.
 
 
 .SH PARAMETERS
+
 There are at least two parameters that are necessary to start a task
 successfully - an ACTION and a NAME. The only exception to providing a
 NAME value is when using the '-t' action, which just creates a blank
@@ -624,6 +630,7 @@ To summarize, the DIRECTORY value can be:
 
 
 .SH ACTIONS
+
 As with virtually all software, switches can be passed to modify its
 operation. The below section covers each switch in detail, separating
 the actions from the options. It is important to note that the options
@@ -698,6 +705,7 @@ the DIRECTORY parameter.
 
 
 .SH OPTIONS
+
 To adjust the behavior of actions, you can pass one or more options when
 executing builder. Remember that these actually need to proceed the action
 switch!
@@ -808,220 +816,192 @@ during the compilation process. To perform this action, the patches will
 obviously need to be included in the 'patches[.#]' directory of the
 builder profile.
 
-
-.B -N VALUE[,VALUE,...]
-For instances where storage space is at a premium, security is critical
-(by miniming the attack vectors), or those that simply want the smallest
-footprint possible, this option will allow only desired files to be
-installed instead of the entire package. Using this switch will imply a
-'-D none' value, so make sure that any lib packages necessary for the
-desired files are also installed.
-
-This can also be implemented within the .deps files themselves using the
-following syntax:
-   PACKAGE.EXT_SOFT{file1,file2,file3,...}
-
-.B -O VALUE
-Another unique feature of pax is that the output can be more than just the
-default 'text'. Currently there are three other options with two of them
-related to XML. The first is just 'xml' and will display the entire result
-of the call at the end of execution. This means that the output will be
-inside either a '<s>' (success) or '<f>' (failure) tag. The second is the
-'xmLive' value that will display output as it is being processed, adding a
-'<failure>' tag in the event of a problem being encountered.
-
-The third additional option is 'fifo' that will output text to a named
-pipe file. The long term goal is to build a server/client framework for
-networks so that devices can be managed by an admin team using this
-interface. Please note, that when using this value, the fifo must be
-managed by the calling script or binary, and must use DIR_TEMP/output as
-its location. This may be updated in future versions.
-
-Since there may be a race condition while processing parameters, this one
-should always be the first in the list to ensure the output is in the
-format desired.
-
-There are plans to also add 'json' and 'html' values in a future release.
-
-.B -P
-This switch simply prompts the user before implementing the requested
-action, showing what is going to occur in the existing output.
-
-.B -Q VALUE
-Like most software that has the option to control verbosity, this switch
-modifies the quietness of the output. Therefore, a value of 'all' will
-actually produce no output, whereas a value of 'none' would make it the
-most verbose it could be. Use 'errors' to reduce the output to only show
-encountered problems, or 'verbose' to show slightly more than the default.
-
-Since there may be a race condition while processing parameters, this one
-should always be the first or second (if -O is also passed) in the list to
-ensure the output is in the format desired.
-
 .B -R VALUE
-Without this flag, whatever action is passed works with the active local
-or remote repo for packages. There may be instances where packages from
-the restore points are desired. For example, lets say that a package got
-updated on the device and now there's an issue. Until that issue can be
-resolved, the user may want to rollback to their prior installation. To
-accomplish this, the user simply needs to run pax with an appropriate -R
-restore point value and the '-u update' action.
+Although rare, there may be times when the package name needs adjustment.
+This option will enable you to remove a portion of the package name, with
+optional use of RegEx anchors in the value. For example, lets take the
+libmount package and adjust it so it becomes mount-lib. By simply passing
+'^lib' with this option, the 'lib' prefix will be removed while retaining
+the 'mount' portion of the name. Since the files compiled will all be libs
+the package will automatically have the '-lib' suffix applied based on the
+EXT_SOFT config value.
 
-Another example may be where a user (accidentally) deleted software from
-their device and now needs it replaced. This can be reversed by issuing
-the -R switch with the corresponding restore point name and the -i action.
+.B -S
+Instead of separating the files into different package types (e.g. bin,
+lib, doc), some Linux distros may prefer to bundle all the contents into a
+a single file. Use this option to perform that step.
 
-To view all the restore points use "-R '*' -l". To view the list within a
-date, specify "-R 'YYYY-MM-DD' -l", or to see the packages contained in a
-certain restore point, use "-R 'YYYY-MM-DD/Restore Point Name' -l". To
-remove certain restore points, use the '-u {delete|purge}' action with the
-date or complete path value for -R, to delete a group or individual point
-respectively.
+.B -U
+Whether testing a profile before finalizing the configuration, or you're a
+package maintainer that needs to compile multiple software, this option
+prevents the essential compilation packages (listed in DEP_MAKE_ALL) from
+getting uninstalled after a successful run of builder. Otherwise, to keep
+the system tidy, those packages will be removed afterwards.
 
-To summarize:
-   o This option works with the -i, -l, and -u actions.
-   o The prevent creating a restore point use '-R none' with -u
-   o The format with -i is: 'YYYY-MM-DD/Restore Point Name'
-   o The format with -l is: '*' or 'YYYY-MM-DD[/Restore Point Name]'
-   o The format with -u is: 'YYYY-MM-DD[/Restore Point Name]'
 
-.B -S VALUE
-This switch changes the source location where the action obtains the
-necessary packages. Depending on the action, this value may be a local
-or network directory, or a remote repo (beginning with 'http' or 'ftp').
 
-An interesting use of the -V, -S, and DIRECTORY values may be to perform
-dianostics on an attached hard drive from another device.
 
-.B -T VALUE
-To prevent typing the full name of each package, this switch will fill in
-this portion of the package name automatically. For example, lets say you
-want to install the alsa-lib package. You can do so by using either the
-full package name '-i alsa-lib' or '-T lib -i alsa'. This switch becomes
-more pratical for a longer list of package names. Please note that all
-packages listed must be of the same type.
+.SH INFO FILE
 
-.B -V VALUE
-Sometimes unknown bugs are discovered once software is released to the
-public, causing productivity issues. In this instance it is helpful to be
-able to install a prior version, even temporarily until the problem can be
-resolved. Using this switch will accomplish that task. The value to pass
-will vary between distros as some may use actual software version numbers,
-others may use values corresponding to releases of their OS. And like the
--m action, this one can also only process one package at a time.
+The .info file contains a plethora of information related to the software,
+but only has meaning to builder to obtain the source code. In that respect
+this file is used as an alternative to a builder profile. Below we will
+cover each field with the value and an example in brackets.
 
-This can also be implemented within the .deps files themselves using the
-following syntax:
-   PACKAGE.EXT_SOFT[1.2.3]
+.B name [tar]
+This line obviously deals with the actual name of the software itself, and
+should correspond with the package name.
 
-.B -X VALUE
-Another unique feature of pax is the ability to proxy certain actions from
-one device to another. This may be useful in situations where there is an
-air gap between devices for security, or this may come in handy where the
-Internet connection at a location is slow or intermittent but better at
-another one.
+.B title [Archive Manager]
+Using two or three words, this should indicate a title for the software.
 
-This switch requires a value corresponding to the removable media mount
-point so the pax command can be executed on another device. Once written,
-plug the media in the other device and execute the 'proxy.sh' script found
-in the 'pax' directory. Please note that the other device needs to also be
-running Linux, or have the ability to process shell scripts. After running
-the script, take the media back to the original device and run that same
-script again. This will install the desired packages automatically.
+.B description [Manages various compressed file types]
+A short description of what the software actually does.
 
-Currently this switch can only work with the -c, -d, and -i actions.
+.B version [1.2.3]
+Obviously this defines which software version this file pertains to
 
-.B -Y
-If you want to see exactly what is going to take place before running the
-actual command, use this switch to perform a dryrun. To get a complete log
-of what will take place, add the '-Q none' switch and/or set DEBUG=1 in
-the config file.
+.B released [2026.03.04]
+The date that the software version was released
 
-.B -Z
-This switch simply adds color to the output.
+.B packaged [2026.03.05]
+The date that the software was turned into a package for the Linux distro
+
+.B authors [Tim, Bill, Paul]
+A comma separated list of developers for the software
+
+.B homepage [https://www.company.com]
+The homepage URL for the software project
+
+.B download [path/to/file/filename.tgz]
+The remaining portion of the homepage URL to complete the download link.
+This can be an alternate to the git and repo options.
+
+.B git [https://distributor.com/path/to/project]
+If an online git repo is used, this would be the URL to the project
+
+.B commit [path/to/commit/abcd...wxyz]
+The remaining portion of the git URL to access the commit notes for the
+project. This is similar to the version line above to indicate the last
+commit included in this release.
+
+.B file [path/to/file/filename.tgz]
+The remaining portion of the git URL to download a pre-packaged source
+code file. This can be an alternate to the homepage and repo options.
+
+.B clone [.git]
+The remaining portion of the git URL to clone a repo locally. This can be
+an alternate to the homepage and repo options.
+
+.B repo [http://distro.com/path/to/repo]
+The Linux distro repo URL
+
+.B package [tar-1.2.3.deb]
+The remaining portion of the repo URL to download the pre-compiled software
+
+.B source [tar-1.2.3.dsc]
+The remaining portion of the repo URL to download the (unpatched) source
+code. This can be an alternate to the homepage and git options.
+
+.B builder [tar-1.2.3.bldr]
+The remaining portion of the repo URL to download the customized builder
+profile for the specific Linux distro. Any specific software patches can
+be added in this file.
+
+.B compile [tar-1.2.3.make]
+The remaining portion of the repo URL to download a single script to
+compile the software. This is not related to builder, but may be an option
+for users as an alternative.
+
+.B size [100K]
+The package size (in kilobytes)
+
+.B installed [150K]
+The installed software size (in kilobytes)
+
+.B category [utilities]
+The category that this software belongs to. This list varies by distro,
+but a reasonable list might include:
+education|games|multimedia|productivity|social|system|utilities
+
+.B interface [cli]
+Defines the software interface: cli|gui
+
+.B toolkit [none]
+Defines the toolkit/language used. Some examples include:
+[CLI] shell|lua|ruby|php|python|tcl|tk|...
+[GUI] fltk|gtk|html|qt|wxWidgets|...
+
+.B rating [g]
+The age restriction placed on the software. This would deal more with
+games and educational software, while most everything else would have a
+'g' value here.	This mirrors the MPA ratings: g|pg|pg-13|nc-17|r
+
+.B license [LGPLv2.1]
+The software license that the software is released under
+
+.B document [https://www.gnu.org/licenses/lgpl-2.1.en.html]
+The URL to an online copy of the license document
+
+.B maintainer [cat_eyes, pedro]
+The comma separated list of names to maintain the package
+
+.B tags [archive manager tar tarball compressed uncompressed ...]
+The space separated project keywords
+
+.B overview [tar is an archive manager that has existed since the 70's...]
+This is a detailed overview for the project, and can span paragraphs
+
+.B comments [This version is compiled without XZY support.]
+Any applicable comments for the package
+
+.B changes [Updated to the latest version]
+Brief list of changes between package releases
+
 
 
 
 
 .SH EXAMPLES
 
-The below list shows various examples for using pax. This list is not
+The below list shows various examples for using builder. This list is not
 exhaustive and does not indicate modifications using any options.
 
-Performing action with all packages [to current directory]:
-     ${TEMP} -{ceilt}
-Performing action with specific packages [to current directory]:
-     ${TEMP} -{cdeilt} package1 package2
-Performing action with package list [to current directory]:
-     ${TEMP} -{cdeilt} packages.txt
-Performing action with specific packages to/in a specified directory:
-     ${TEMP} -{cdeilt} package1 package2 /target/path
-Performing action with a package list to/in a specified directory:
-     ${TEMP} -{cdeilt} packages.txt /target/path
-Performing action with specific packages from/in a specified directory:
-     ${TEMP} -S {URL|/source/path} -{cdeilt} package1 package2
-Performing action with a package list from/in a specified directory:
-     ${TEMP} -S {URL|/source/path} -{cdeilt} packages.txt
-Performing action with all packages between specified directories:
-     ${TEMP} -S {URL|/source/path} -{cdei} /target/path
-Performing action with a package list between specified directories:
-     ${TEMP} -S {URL|/source/path} -{cdei} packages.txt /target/path
+Download a builder profile from your Linux distro repo:
+     builder -d tar [DIRECTORY]
+Install a (manually) downloaded builder profile:
+     builder -i tar [DIRECTORY]
+  NOTE: the above two steps can be combined:
+     builder -d -i tar [DIRECTORY]
 
-Find files in available packages:
-     ${TEMP} -f file1 file2
-Find files in available packages from a filelist:
-     ${TEMP} -f files.txt
-Find files in packages within a specified directory:
-     ${TEMP} -f file1 file2 /source/path
-     ${TEMP} -S /source/path -f file1 file2
-Install a specific version:
-     ${TEMP} -V 1.2.3 -i package
-Install a package from a valid restore point:
-     ${TEMP} -R 'YYYY-MM-DD/Restore Point' -i package
-List all restore points:
-     ${TEMP} -R '*' -l
-List all restore points in a valid date:
-     ${TEMP} -R 'YYYY-MM-DD' -l
-List all packages in a valid restore point:
-     ${TEMP} -R 'YYYY-MM-DD/Restore Point' -l
-Make a package for distribution:
-     ${TEMP} -m package /path/containing/{package|source}
-     ${TEMP} -S /path/containing/{package|source} -m package
-     ${TEMP} -S /path/containing/{package|source} -m file
-Open a fifo to operate pax:
-     ${TEMP} -o
-Open a fifo to operate pax in a specified directory:
-     ${TEMP} -o /path/to/fifo
-     ${TEMP} -S /path/to/fifo -o
-Open a fifo to operate pax using a specific fifo:
-     ${TEMP} -o name
-Open a fifo to operate pax, clearing a prior failure:
-     ${TEMP} -o clear
-Open a fifo to operate pax, clearing and using specific fifo:
-     ${TEMP} -o name clear
-Proxy a download:
-     ${TEMP} -X /mnt/sdb1 -d package1 package2
-Proxy an install:
-     ${TEMP} -X /mnt/sdb1 -i package1 package2
-Unload a package:
-     ${TEMP} -u unload package
-Uninstall a package, leaving configs:
-     ${TEMP} -u delete package
-Uninstall a package, including configs too:
-     ${TEMP} -u purge package
-Uninstall a package, without a restore point:
-     ${TEMP} -R none -u delete package
-Update a package (uninstall old, install new):
-     ${TEMP} -u update package
-Delete a restore point(s):
-     ${TEMP} -R 'DATE[/Restore Point]' -u {delete|purge}
+After the installation of a builder profile, the software can be compiled
+or packaged.
+
+Compile and install software:
+     builder -c tar
+Compile and create a distro package:
+     builder -b tar
+
+For software developers that want to create a generic builder profile for
+their project, builder can make templates. If a profile is not available
+from the software author, package maintainers can perform the following
+steps to create one for their specific Linux distro.
+
+Create a .info file template:
+     builder -t info myproject [DIRECTORY]
+Create a profile template:
+     builder -t profile myproject [DIRECTORY]
+  NOTE: the above two steps can be combined:
+     builder -t all myproject [DIRECTORY]
+Create a distributable profile after the above two steps:
+     builder -p myproject [DIRECTORY]
 
 
 
 
 .SH BUGS
 
-There are no known bugs as of January 2026.
+There are no known bugs as of March 2026.
 
 Please visit our website for the latest list of opened bug reports for
 this software project - http://www.cliquesoft.org.
@@ -1030,20 +1010,28 @@ this software project - http://www.cliquesoft.org.
 
 .SH COPYRIGHT
 
-Copyright (C) 2016-2026 Cliquesoft
+Copyright (C) 2017-2026 Cliquesoft
 
-Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
-device, this software is licensed under the Cliquesoft Public License (CPLv2)
-as found on the Cliquesoft website at www.cliquesoft.org.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the appropriate Cliquesoft License for details.
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
 
-You should have received a copy of the Cliquesoft Public License v2 with the
-software itself; if not, please visit our website for the complete document:
-
-   https://www.cliquesoft.org
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
 
 
 

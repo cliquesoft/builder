@@ -532,9 +532,9 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "			scons"
 	echo "	-N	the number of passes to make when compiling"
 	echo "	-P	prevent patching from occurring"
-	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"		# this is useful for XiniX when compiling something like 'libmount' so it can become 'mount.i32.lib.soft'; this value can use regex anchors [^$]
+	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"
 	echo "	-S	package all contents in a single package - do NOT separate"
-	echo "	-U	do not unload compilation packages afterwards"				# this is useful for testing the build profile before it works correctly -OR- just to prevent excessive resource usage when building an entire repo
+	echo "	-U	do not unload compilation packages afterwards"
 	echo
 	echo
 	echo "  Build Software Steps:                             [end user/package creator]"
@@ -902,22 +902,20 @@ elif [ "$TEMPLATE" ]; then
 		echo "version:	1.2.3" >>"${DIR_TEMP}/${NAME}.info"
 		echo "released:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
 		echo "packaged:	YYYY.MM.DD" >>"${DIR_TEMP}/${NAME}.info"
-		echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"						# DOC NOTE
-		echo "homepage:	https://www.company.com" >>"${DIR_TEMP}/${NAME}.info"					# 	NOTE: these are all appended to main URL (homepage, git, repo)
-		echo "download:	path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"					# oem direct download link from their website
-		echo "git:		https://distributor.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"		# oem git url
-		echo "commit:		path/to/commit/abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"			# 	the commit that this package is based on (similar to version)
-		echo "file:		path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"				# files associated with that
-		echo "clone:		.git" >>"${DIR_TEMP}/${NAME}.info"						# to clone a repo locally
-		echo "repo:		http://domain.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"				# linux distro repo url
-		echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"					# files associated with that
+		echo "authors:	Name(s)" >>"${DIR_TEMP}/${NAME}.info"
+		echo "homepage:	https://www.company.com" >>"${DIR_TEMP}/${NAME}.info"
+		echo "download:	path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"
+		echo "git:		https://distributor.com/path/to/project" >>"${DIR_TEMP}/${NAME}.info"
+		echo "commit:		path/to/commit/abcd...wxyz" >>"${DIR_TEMP}/${NAME}.info"
+		echo "file:		path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"
+		echo "clone:		.git" >>"${DIR_TEMP}/${NAME}.info"
+		echo "repo:		http://distro.com/path/to/repo" >>"${DIR_TEMP}/${NAME}.info"
+		echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"
 		echo "source:		example-1.2.3.${EXT_CODE}" >>"${DIR_TEMP}/${NAME}.info"
 		echo "builder:	example-1.2.3.${EXT_BLDR}" >>"${DIR_TEMP}/${NAME}.info"
 		echo "compile:	example-1.2.3.${EXT_MAKE}" >>"${DIR_TEMP}/${NAME}.info"
 		echo "size:		100K" >>"${DIR_TEMP}/${NAME}.info"
-# DOC NOTE: multimedia is for playback (e.g. vlc, mplayer, winamp, pluto tv, netflix), productivity is for work (e.g. libre office, blender, gimp, hypertext), social is for forms of communication (e.g. thunderbird, pidgin, skype, etc), system is for drivers/firmware, services, and compatibility (e.g. samba, ssh, ntfs, sshfs, etc), utilities are for helpful apps (e.g. nmap, curl, winzip, etc)
-# Development was merged into Productivity
-# Accessibility was merged into System
+		echo "installed:	150K" >>"${DIR_TEMP}/${NAME}.info"
 		echo "category:	system	# education|games|multimedia|productivity|social|system|utilities" >>"${DIR_TEMP}/${NAME}.info"
 		echo "interface:	gui	# cli|gui" >>"${DIR_TEMP}/${NAME}.info"
 		echo "toolkit:	gtk2	# [CLI] shell|lua|ruby|php|python|tcl|tk|...  [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"

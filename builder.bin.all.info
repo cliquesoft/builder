@@ -17,6 +17,7 @@ source:		stable.code
 builder:	stable.bldr
 compile:	stable.make
 size:		106K
+installed:	?K
 category:	utility
 interface:	cli
 toolkit:	shell
