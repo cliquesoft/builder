@@ -166,3 +166,15 @@
 - Removed several comments after finishing the man page
 - Finished creating the man page
 
+2026/03/05
+- Removed the filename from the URL_REPO value (since it's multi-functional)
+- Added the --install option to replace install.sh since distros will vary
+  where they want the files installed to
+- Updated the 'package' script to use lsb2-install.sh as the default for the
+  --install action
+- Created a generic global config file
+- Update the NOTES file
+- Added EXT_BIND
+
+- Tested with TC
+

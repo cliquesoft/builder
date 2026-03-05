@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/02/26 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/05 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -49,6 +49,7 @@ export EXT_INFO='${TYPE}.${ARCH}.info'				# [text file] package information
 export EXT_LIST='${TYPE}.${ARCH}.list'				# [text file] package manifest list
 export EXT_MAKE='${TYPE}.${ARCH}.make'				# [text file] package make commands
 export EXT_SOFT='${TYPE}.${ARCH}.soft'				# [mksquashfs file] packaged compiled software
+export EXT_BIND=''						# [text] the syntax to remove from binary package names (BIND = binary delete)
 
 export OWN_USER='root'						# the ownership to apply to files of the package
 export OWN_GROUP='staff'
@@ -58,7 +59,7 @@ export PRM_FILES='664'						# the permissions to apply to all files of the packa
 export PRM_EXECS='755'						# the permissions to apply to all executables in /bin, /sbin, etc and also the libraries
 
 export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}.${EXT_INFO}'		# the .info file URL used to obtain the package source code (set in builder config file)
-export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}.${EXT_CODE}'		# the distro repo URL used to obtain the package source code (set in builder config file)
+export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}'				# the distro repo URL used to obtain the package source code and builder profiles (set in builder config file)
 
 export SPM_ALL='$SUDO pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
 export SPM_PACK='$SUDO pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
@@ -216,7 +217,7 @@ export FLAG_MAKE=''						# the flags to pass to the 'make' call
 # Syntax: stop TYPE [EXIT]
 # Exits gracefully by cleaning up the desired parts of the file system after a failed build
 # TYPE	the type of cleanup to perform: failed, clean (for multi-pass), proper
-# EXIT	if the function should exit this script afterwards: 0, 1 (default)
+# EXIT	if the function should exit this script afterwards: 0=no, 1=yes (default)
 stop() {
 	[ "$1" = 'failed' ] && echo "ERROR: This step failed to complete, check the log for details."
 
@@ -379,10 +380,6 @@ package() {
 
 	# CREATE EACH PACKAGE
 
-# 2026/03/03 - the -F was turned into a negation
-#	if [ ! "$SKIP" ] || ( [ "$SKIP" ] && [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# if '-F' wasn't passed -OR- it was -and- we are on the last pass, then exit this function
-#		return 0
-#	fi
 	[ ! "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && return 0				# if '-F' was passed -AND- '-N' was passed -AND- we are on the last pass, then exit this function
 
 	cd "${DIR_DUMP}" 2>>"$LOG" || {								# change into the temp packaging directory
@@ -417,7 +414,7 @@ package() {
 			eval PAK_HASH="$EXT_HASH"
 			eval PAK_INFO="$EXT_INFO"
 			eval PAK_LIST="$EXT_LIST"
-			eval PAK_SOFT="$EXT_SOFT"
+			eval PAK_SOFT="$(echo "$EXT_SOFT" | sed "s/${EXT_BIND}//")"		# remove any applicable naming convention from the software package name (e.g. -bin)
 
 			eval URL_TEMP="${URL_INFO//NAME/ID}"
 
@@ -609,6 +606,14 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	  builder profile (e.g. alsa-libs, alsa-utils) - see NOTES"
 	echo
 	exit 0
+elif [ "$1" = '--install' ]; then
+	[ ! -e "${DIR_CONF}/install" ] && {
+		echo "ERROR: The install script is missing to perform this action."
+		echo "       If this was installed from a package, builder is already installed."
+		exit 1
+	}
+	"${DIR_CONF}/install" || exit 1
+	exit 0
 elif [ "$1" = '--version' ]; then
 	head -5 $0 | grep Updated | sed "s/.*\\t//;s/ .*//;s:/:.:g"
 	exit 0
@@ -707,8 +712,6 @@ TEMP=0
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
 
 # option checking
-# UPDATED 2026/03/03 - the -F was turned into a negation
-#[ "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
 [ ! "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
 if [ "$WGET" != '' ]; then
 	TEMP=''
@@ -747,6 +750,7 @@ if [ ! "$TEMPLATE" ]; then
 	eval EXT_LIST="\"$EXT_LIST\""
 	eval EXT_MAKE="\"$EXT_MAKE\""
 	eval EXT_SOFT="\"$EXT_SOFT\""
+	eval EXT_BIND="\"$EXT_BIND\""
 
 	eval URL_CODE="$URL_CODE"
 	eval URL_INFO="$URL_INFO"
@@ -1168,9 +1172,8 @@ fi
 # BEGIN THE BUILD/COMPILE PROCESS
 
 # for optional values not configured above
-if [ ! "$ARCH" ] || [ "$ARCH" = 'all' ]; then			# if the default (which is all) or a specified 'all' was passed, then...
-	# cycle each defined CPU architecture and compile
-	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do		# call this script again for all supported CPU architecture and exit
+if [ "$ARCH" = 'all' ]; then					# if we need to compile all architectures, then...
+	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do		# call this script for all supported CPU architectures and exit
 		TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
 		[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 		[ "$DIRS" ] && TEMP="$TEMP -D"
@@ -1195,7 +1198,7 @@ fi
 if ( [ -d "${DIR_DUMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}.bin" ] ) && ( [ ! "$PASS" ] || ( [ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] ) ); then
 	echo -n "It appears a prior (attempted) compile has left files behind, cleanup? [Y/N] (N): "
 	read
-	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0
+	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0				# NOTE: the script does NOT stop here if 'yes' was requested
 fi
 
 
@@ -1361,7 +1364,7 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		fi
 	}
 	[ "$WGET" = 'repo' ] && {
-		TEMP="$(echo "$URL_REPO" | sed "s/\${NAME}/$TEMP/g")"
+		TEMP="$(echo "${URL_REPO}/${NAME}.${EXT_CODE}" | sed "s/\${NAME}/$TEMP/g")"
 		eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
 		eval wget "$TEMP" 2>>"$LOG" || stop failed
 	}

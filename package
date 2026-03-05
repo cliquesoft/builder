@@ -2,7 +2,7 @@
 # package	the script to package pax for various Linux distros
 #
 # created	2025/10/25 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/02/03 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/03/05 by Dave Henderson (support@cliquesoft.org)
 
 ( [ ! "$1" ] || [ "$1" = '--help' ] ) && {
 	echo
@@ -82,7 +82,7 @@ if [ "$1" = 'generic' ]; then
 	chown -R 1000:1000 "${STAGING}/"*			# NOTE: can't perform this step as the user, so this script needs to be run as root
 	cd "$STAGING"
 	cd usr/local/etc/${PROJECT}				# NOTE: this is a separate command so we can use 'cd -'
-# left off - copy in the install.sh file; add this to pax too
+	ln -sf lsb2-install.sh install
 elif [ "$1" = 'tc' ]; then
 	chown -R 0:50 "${STAGING}/"*
 	cd "$STAGING"
