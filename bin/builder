@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/05 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/10 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -133,7 +133,7 @@ REPACK=''							# indicates that we just need to repack the software since somet
 TEMPLATE=''							# creates a blank builder profile template and exit
 
 # [options]
-export ARCH='i64'						# the current CPU architecture being compiled (e.g. i32, i64, ...)
+export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
 DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
 INFOFILE=''							# stores the info file to download/use to obtain the software
 export PASS=''							# the number of passes to make during compile (blank disables)
@@ -141,7 +141,7 @@ PATCH='TRUE'							# indicates we need to apply patches to the source code
 SKIP='TRUE'							# indicates we need to skip packaging until the final pass (blank doesn't wait)
 SINGLE=''							# indicates all files need to be placed in a single package
 TRIM=''								# any part of the name to remove when building the package
-METHOD='default'						# the method of compile being performed (e.g. autogen, bootstrap, ...)
+METHOD=''							# the method of compile being performed (e.g. autogen, bootstrap, ...)
 WGET=''								# indicates that we need to download the source code file; valid values: local, private, public
 UNLOAD=''							# indicates we need to unload the packages afterwards - regardless of success or failure
 
@@ -494,44 +494,46 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	${THIS##*/} [OPTIONS] ACTION NAME [DIRECTORY]"
 	echo
 	echo "  Actions:"
-	echo "	-b	build a distributable package"
-	echo "	-c	compile the software only, no packaging"
-	echo "	-d	download the builder profile (uses URL_REPO)"
-	echo "	-i	install the builder profile"
-	echo "	-p	create a builder profile"
-	echo "	-r	only re-package software instead of building"
+	echo "	-b   build a distributable package"
+	echo "	-c   compile the software only, no packaging"
+	echo "	-d   download the builder profile (uses URL_REPO)"
+	echo "	-i   install the builder profile"
+	echo "	-p   create a builder profile"
+	echo "	-r   only re-package software instead of building"
 # VER2 - for every -C value that's filled out, this can sync the software with each of those sources with a single command
-#	echo "	-s	sync source code to all configured locations"
-	echo "	-t	create a package template: all, info, profile"
+#	echo "	-s   sync source code to all configured locations"
+	echo "	-t   create a package template: all, info, profile"
 # VER2 - check for updates to software via git or website; also allow this to be setup via cron to automatically check
 #	if the (homepage) link is not present (since it would change to a different filename), there's an update
-#	echo "	-u	checks for updated versions of software"
+#	echo "	-u   checks for updated versions of software"
 	echo
-	echo "	--help		shows this screen"
-	echo "	--version	shows the version of this script"
+	echo "	--help      shows this screen"
+	echo "	--install   installs the ${THIS##*/} software"
+	echo "	--version   shows the version of this script"
 	echo
 	echo "  Options:"
-	echo "	-A	the CPU architecture to build:"
-	echo "			${CPU},all"
-	echo "	-C	obtain source code from:"
+	echo "	-A   the CPU architecture to build:"
+	echo "		${CPU},all"
+	echo "	-C   obtain source code from:"
 # VER2 - add a 'sync' option that uses rsync
-	echo "			dev(eloper)|dir(ectory)|git(clone)|(distro)repo"
-	echo "	-D	package using directories in DIR_DUMP instead of NAME value"
-	echo "	-F	does NOT wait until the final pass to package files"
-	echo "	-I	download the package info file and use its locations"
-	echo "	-M	the compile method to use:"
-	echo "			autoconf"
-	echo "			autogen"
-	echo "			bootstrap"
-	echo "			cmake"
-	echo "			custom"
-	echo "			default (configure, make, make install)"
-	echo "			scons"
-	echo "	-N	the number of passes to make when compiling"
-	echo "	-P	prevent patching from occurring"
-	echo "	-R	remove a portion of NAME when packaging; can use regex anchors"
-	echo "	-S	package all contents in a single package - do NOT separate"
-	echo "	-U	do not unload compilation packages afterwards"
+	echo "		dev(eloper)|dir(ectory)|git(clone)|(distro)repo"
+	echo "	-D   package using directories in DIR_DUMP instead of NAME value"
+	echo "	-F   does NOT wait until the final pass to package files"
+	echo "	-I   download the package info file and use its locations"
+	echo "	-M   the compile method to use:"
+	echo "		autoconf"
+	echo "		autogen"
+	echo "		bootstrap"
+	echo "		cmake"
+	echo "		custom"
+	echo "		default (configure, make, make install)"
+	echo "		scons"
+	echo "	-N   the number of passes to make when compiling"
+	echo "	-P   prevent patching from occurring"
+	echo "	-R   remove a portion of NAME when packaging; can use regex anchors"
+	echo "	-S   package all contents in a single package - do NOT separate"
+	echo "	-T   specifies the package type: bin, dev, doc, drv, gir, lib, loc"
+	echo "	-U   do not unload compilation packages afterwards"
 	echo
 	echo
 	echo "  Build Software Steps:                             [end user/package creator]"
@@ -619,7 +621,7 @@ elif [ "$1" = '--version' ]; then
 	exit 0
 else
 	TEMP=0
-	while getopts A:bcC:dDeFiIM:N:pPrR:St:U OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
+	while getopts A:bcC:dDeFiIM:N:pPrR:St:T:U OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -634,10 +636,10 @@ else
 			   ARCH="$OPTARG" ;;
 			b) BUILD='TRUE' ;;
 			c) COMPILE='TRUE' ;;
-			C) if ( ! echo "${WGET}" | grep -qE ^'(dev|dir|git|repo)'$ ); then
+			C) ( echo "${OPTARG}" | grep -qE ^'(dev|dir|git|repo)'$ ) || {
 				echo "ERROR: An invalid value for '-C' was passed."
 				exit 1
-			   fi
+			   }
 			   WGET="$OPTARG" ;;
 			d) DOWNLOAD='TRUE' ;;
 			D) DIRS='TRUE' ;;
@@ -651,11 +653,16 @@ else
 			r) REPACK='TRUE' ;;
 			R) TRIM="$OPTARG" ;;
 			S) SINGLE='TRUE' ;;
-			t) if ( ! echo "${OPTARG}" | grep -qE ^'(all|info|profile)'$ ); then
+			t) ( echo "${OPTARG}" | grep -qE ^'(all|info|profile)'$ ) || {
 				echo "ERROR: An invalid value for '-t' was passed."
 				exit 1
-			   fi
+			   }
 			   TEMPLATE="$OPTARG" ;;
+			T) ( echo "${OPTARG}" | grep -qE ^'(bin|dev|doc|drv|gir|lib|loc)' ) || {
+				showMsg 'failure' "ERROR: An invalid value for '-T' was passed." 'screen'
+				exit 1
+			   }
+			   TYPE="$OPTARG" ;;
 			U) UNLOAD='TRUE' ;;
 			*) exit 1 ;;				# NOTE: since 'getopts' presents it own error, we don't need to do so here
 		esac
@@ -712,6 +719,18 @@ TEMP=0
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
 
 # option checking
+[ "$ARCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -A option can't be used with this action."; exit 1; }
+[ "$WGET" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -C option can't be used with this action."; exit 1; }
+[ "$DIRS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -D option can't be used with this action."; exit 1; }
+[ ! "$SKIP" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -F option can't be used with this action."; exit 1; }
+[ "$INFOFILE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -I option can't be used with this action."; exit 1; }
+[ "$INFOFILE" ] && [ ! "$WGET" ] && { echo "The -I option must be used with the -C option."; exit 1; }
+[ "$METHOD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -M option can't be used with this action."; exit 1; }
+[ "$PASS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -N option can't be used with this action."; exit 1; }
+[ ! "$PATCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -P option can't be used with this action."; exit 1; }
+[ "$TRIM" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -R option can't be used with this action."; exit 1; }
+[ "$SINGLE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -S option can't be used with this action."; exit 1; }
+[ "$UNLOAD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -U option can't be used with this action."; exit 1; }
 [ ! "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
 if [ "$WGET" != '' ]; then
 	TEMP=''
@@ -732,6 +751,7 @@ if [ "$WGET" != '' ]; then
 fi
 
 # set default/uninitialized variable values			  NOTE: we have to set these here since they rely on functions above
+[ ! "$ARCH" ] && ARCH='i64'
 [ ! "$METHOD" ] && METHOD='default'
 eval LOG="\"$LOG\""						# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
 
@@ -782,6 +802,12 @@ if [ ! -d "${LOG%/*}" ]; then
 fi
 touch "${LOG%/*}/writable" >/dev/null 2>&1 || { showMsg 'failure' "The logs directory ($LOG%/*}) is not writable." 'screen'; exit 1; }
 rm "${LOG%/*}/writable" >/dev/null 2>&1
+
+if [ ! -d "$DIR_PROF" ]; then
+	mkdir -p "$DIR_PROF" >/dev/null 2>&1 || { echo "ERROR: The profile cache directory (DIR_PROF) does not exist and could not be created."; exit 1; }
+fi
+touch "${DIR_PROF}/writable" >/dev/null 2>&1 || { echo "ERROR: The profile cache directory (DIR_PROF) is not writable."; exit 1; }
+rm "${DIR_PROF}/writable" >/dev/null 2>&1
 
 if [ ! -d "$DIR_REPO" ]; then
 	mkdir -p "$DIR_REPO" >/dev/null 2>&1 || { echo "ERROR: The local software repository (DIR_REPO) does not exist and could not be created."; exit 1; }
@@ -835,8 +861,8 @@ fi
 if [ "$DOWNLOAD" ]; then
 	echo -e "\nDownloading the requested builder profile..." | tee -a "$LOG"
 
-	echo -e "Calling: wget -cq \"${URL_REPO}/${NAME}.${EXT_BLDR}\" -O \"./${NAME}.${EXT_BLDR}\"" >>"$LOG"
-	( wget -cq "${URL_REPO}/${NAME}.${EXT_BLDR}" -O "./${NAME}.${EXT_BLDR}" 2>&1 | tee -a "$LOG" | grep -q 404 ) && {
+	eval echo -e "Calling: wget -cq \"${URL_REPO}/${NAME}.${EXT_BLDR}\" -O \"./${NAME}.${EXT_BLDR}\"" >>"$LOG"
+	( eval wget -cq "${URL_REPO}/${NAME}.${EXT_BLDR}" -O "./${NAME}.${EXT_BLDR}" 2>&1 | tee -a "$LOG" | grep -q 404 ) && {
 		echo "ERROR: The package builder profile download failed (${NAME}.${EXT_BLDR})." | tee -a "$LOG"
 		return 1
 	}
@@ -863,7 +889,7 @@ if [ "$INSTALL" ]; then
 	}
 
 	if [ "$(file -b --mime-type "$NAME")" = 'application/x-gzip' ]; then			# if the profile has been checked and does not exist, then...
-		echo "Calling: tar -xzf \"$NAME\"\ -C \"$DIR_PROF\"" >>"$LOG"
+		echo "Calling: tar -xzf \"$NAME\" -C \"$DIR_PROF\"" >>"$LOG"
 		tar -xzf "$NAME" -C "$DIR_PROF" 2>>"$LOG" || {
 			echo "ERROR: The builder profile could not be installed." >>"$LOG"
 			stop failed
@@ -1196,7 +1222,7 @@ fi
 
 # if any directory exists -AND- we are doing a single pass -or- on the first pass of a multi-pass (via cli or params file) and the .pass file doesn't exist (via 'stop failed'), then...
 if ( [ -d "${DIR_DUMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}.bin" ] ) && ( [ ! "$PASS" ] || ( [ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] ) ); then
-	echo -n "It appears a prior (attempted) compile has left files behind, cleanup? [Y/N] (N): "
+	echo -n "It appears a prior (attempted) compile has left files, cleanup? [Y/N] (N): "
 	read
 	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0				# NOTE: the script does NOT stop here if 'yes' was requested
 fi
@@ -1314,14 +1340,20 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 
 		# now set the variable values for the below code blocks
 		if [ "$WGET" = 'dev' ]; then
-			URL_CODE="$(grep -i -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			if ( grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | grep -qE ^'(ht|f)tp' ); then				# if the 'download' value is not a continuation of the 'homepage', then it's the entire URL so...
+				URL_CODE="$(grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//')"
+			elif ( grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ); then							# otherwise it is has a value and is a continuation, then append it to 'homepage'...
+				URL_CODE="$(grep -i -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			fi
 			[ ! "$URL_CODE" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		elif [ "$WGET" = 'git' ]; then
-			GIT_REPO="$(grep -i -e ^'git:' -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
-			[ ! "$GIT_REPO" ] && GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			# if there's a 'file' value, then...
+			( grep -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ) && GIT_REPO="$(grep -i -e ^'git:' -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			[ ! "$GIT_REPO" ] && ( grep -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ) && GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$GIT_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		elif [ "$WGET" = 'repo' ]; then
-			URL_REPO="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			# if there's a 'package' value, then...
+			( grep -e ^'package:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ) && URL_REPO="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$URL_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		fi
 	fi
@@ -1405,6 +1437,9 @@ elif [ "$CODE" ]; then										# if we have a CODE value, then we need to chang
 		stop failed
 	}
 fi
+
+echo DEBUG
+exit 0
 
 if [ "$METHOD" = 'autoconf' ] && [ ! -e 'configure.ac' ]; then
 	echo "ERROR: It does not appear that builder was called from within the source code directory." >>"$LOG"

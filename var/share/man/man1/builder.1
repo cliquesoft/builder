@@ -831,6 +831,11 @@ Instead of separating the files into different package types (e.g. bin,
 lib, doc), some Linux distros may prefer to bundle all the contents into a
 a single file. Use this option to perform that step.
 
+.B -T VALUE
+When obtaining various files from a distro repo, you may need to specify
+which file type is being sought. This option allows you to obtain the
+desired file.
+
 .B -U
 Whether testing a profile before finalizing the configuration, or you're a
 package maintainer that needs to compile multiple software, this option
@@ -868,14 +873,22 @@ The date that the software version was released
 The date that the software was turned into a package for the Linux distro
 
 .B authors [Tim, Bill, Paul]
-A comma separated list of developers for the software
+A comma separated list of developers for the software. Alternatively, this
+value can contain a single person per line, with a preceeding and trailing
+set of dashes:
+   authors:	-----
+		Author 1 <name@domain.com>
+		Author 2 <name@domain.com>
+		...
+		-----
 
 .B homepage [https://www.company.com]
 The homepage URL for the software project
 
 .B download [path/to/file/filename.tgz]
 The remaining portion of the homepage URL to complete the download link.
-This can be an alternate to the git and repo options.
+If the URL is completely different from the homepage value, then list the
+entire value here. This can be an alternate to the git and repo options.
 
 .B git [https://distributor.com/path/to/project]
 If an online git repo is used, this would be the URL to the project

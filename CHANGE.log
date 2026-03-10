@@ -176,5 +176,15 @@
 - Update the NOTES file
 - Added EXT_BIND
 
-- Tested with TC
+2026/03/10
+- Added .info value checks to the -C option
+- Added a check for the existence of DIR_PROF
+- Added option checks combined with appropriate actions
+- Added the -T option
+- Updated the man page
+- Updated where the default values are specified for ARCH and METHOD
+- Updated the -d action to eval the URL_REPO value
+- Updated an error the the -C value test
+- Began testing the project
+- Updated the --help output
 
