@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/10 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/11 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -236,12 +236,12 @@ stop() {
 	elif [ "$1" = 'proper' ]; then
 		[ ! "$NAMES" ] && NAMES="$NAME"			# if the 'packaging' stage hasn't been reached yet, the only directory that would possibly exist would just be NAME
 		for DIR in $NAMES; do
-			rm -Rf "${DIR_TEMP:?}/${DIR}" 2>>"$LOG"
+			rm -Rf "${DIR_TEMP:?}/${DIR}/"* 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.pass" 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
 
-			[ -d "${DIR_DUMP:?}/${DIR}" ] && rm -Rf "${DIR_DUMP:?}/${DIR}" 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
+			[ -d "${DIR_DUMP:?}/${DIR}" ] && rm -Rf "${DIR_DUMP:?}/${DIR}/"* 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
 			for PACK in bin dev doc drv gir lib loc; do
 				if [ -d "${DIR_DUMP:?}/${DIR}.${TYPE}" ]; then
 					rm -Rf "${DIR_DUMP:?}/${DIR}.${TYPE}" 2>>"$LOG" || {
@@ -434,7 +434,7 @@ package() {
 			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
 			[ "$URL_INFO" ] && {							# download the existing information file
 				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
-				eval wget "$URL_TEMP" -O "${DIR_REPO}/${ID}${PAK_INFO}" 2>/dev/null
+				eval wget -cq "$URL_TEMP" -O "${DIR_REPO}/${ID}${PAK_INFO}" 2>/dev/null
 			}
 
 			mv "${ID}${PAK_SOFT}" "${ID}${PAK_LIST}" "${ID}${PAK_HASH}" "$DIR_REPO"
@@ -677,7 +677,7 @@ else
 	shift $(expr $OPTIND - 1)								# now that the ACTIONS and OPTIONS have been processed, lets process the package name(s)
 	eval TEMP=\${$#}									# store the current last passed value to later check if a directory was passed as the last value	http://stackoverflow.com/questions/1853946/getting-the-last-argument-passed-to-a-shell-script
 	if [ "$TEMP" != "$0" ] && ( echo "$TEMP" | grep -q '/' ); then				# if a DIRECTORY was passed, then...
-		[ ! -d "$TEMP" ] && { echo "ERROR: The passed directory does not exist (${TEMP})."; exit 1; }					#   if it does NOT exist, then...
+		[ "$WGET" != 'dir' ] && [ ! -d "$TEMP" ] && { echo "ERROR: The passed directory does not exist (${TEMP})."; exit 1; }		#  if '-C dir' was NOT passed -AND- if it does NOT exist, then...
 
 		DIRECTORY="$TEMP"								#   store the DIRECTORY value
 
@@ -734,7 +734,7 @@ TEMP=0
 [ ! "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
 if [ "$WGET" != '' ]; then
 	TEMP=''
-	( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'git' ] && [ ! "$GIT_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) ) && {
+	[ ! "$INFOFILE" ] && ( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'git' ] && [ ! "$GIT_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) ) && {
 		[ "$WGET" = 'dev' ] && TEMP='URL_CODE'
 		[ "$WGET" = 'dir' ] && TEMP='DIR_REPO'
 		[ "$WGET" = 'git' ] && TEMP='GIT_REPO'
@@ -744,6 +744,20 @@ if [ "$WGET" != '' ]; then
 		exit
 	}
 
+	if [ "$WGET" = 'dir' ]; then
+		[ ! "$DIRECTORY" ] && {
+			echo "ERROR: The '-C dir' option requires a DIRECTORY value including the filename."
+			exit
+		}
+		[ ! -f "$DIRECTORY" ] && {
+			echo "ERROR: The '-C dir' option requires a filename appended to the DIRECTORY value."
+			exit
+		}
+		[ "$INFOFILE" ] && {
+			echo "ERROR: The '-C dir' option can't be used with the -I option."
+			exit
+		}
+	fi
 	[ "$WGET" = 'git' ] && [ ! "$(which git)" ] && {
 		echo "ERROR: The git binary is missing and is necessary when using '-C git'."
 		exit
@@ -762,15 +776,16 @@ if [ ! "$TEMPLATE" ]; then
 	eval DIR_REPO="$DIR_REPO"
 	eval DIR_TEMP="$DIR_TEMP"
 
-	eval EXT_BLDR="\"$EXT_BLDR\""				# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
-	eval EXT_CODE="\"$EXT_CODE\""
-	eval EXT_DEPS="\"$EXT_DEPS\""
-	eval EXT_HASH="\"$EXT_HASH\""
-	eval EXT_INFO="\"$EXT_INFO\""
-	eval EXT_LIST="\"$EXT_LIST\""
-	eval EXT_MAKE="\"$EXT_MAKE\""
-	eval EXT_SOFT="\"$EXT_SOFT\""
-	eval EXT_BIND="\"$EXT_BIND\""
+# REMOVED 2026/03/11 - these need to be interpritted at different times
+#	eval EXT_BLDR="\"$EXT_BLDR\""				# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
+#	eval EXT_CODE="\"$EXT_CODE\""
+#	eval EXT_DEPS="\"$EXT_DEPS\""
+#	eval EXT_HASH="\"$EXT_HASH\""
+#	eval EXT_INFO="\"$EXT_INFO\""
+#	eval EXT_LIST="\"$EXT_LIST\""
+#	eval EXT_MAKE="\"$EXT_MAKE\""
+#	eval EXT_SOFT="\"$EXT_SOFT\""
+#	eval EXT_BIND="\"$EXT_BIND\""
 
 	eval URL_CODE="$URL_CODE"
 	eval URL_INFO="$URL_INFO"
@@ -847,10 +862,13 @@ fi
 
 # CHANGE DIRECTORY
 
-if [ "$DIRECTORY" ]; then
-	[ "$TEMPLATE" ] && DIR_TEMP="$DIRECTORY"		# if we're creating a template, then we need to change this variable value so the below code works correctly
-	[ "$PROFILE" ] && { cd "${DIRECTORY}/.." >/dev/null || exit 1; }
-	[ ! "$PROFILE" ] && { cd "$DIRECTORY" >/dev/null || exit 1; }
+if [ "$DIRECTORY" ]; then									# if DIRECTORY was passed, then...
+	[ "$TEMPLATE" ] && DIR_TEMP="$DIRECTORY"						#   if we're creating a template, then we need to change this variable value so the below code works correctly
+	[ "$PROFILE" ] && { cd "${DIRECTORY}/.." >/dev/null || exit 1; }			#   if we're creating a builder profile...		NOTE: this goes one level up from the passed DIRECTORY value
+	[ ! "$PROFILE" ] && [ "$WGET" != 'dir' ] && { cd "$DIRECTORY" >/dev/null || exit 1; }	#   for any other action (that doesn't involve '-C dir'), change into the DIRECTORY
+else												# otherwise it was NOT passed, so...
+	[ "$DOWNLOAD" ] && cd "$DIR_PROF"							#   change into the default download location
+	[ "$INSTALL" ] && cd "$DIR_PROF"							#   ditto
 fi
 
 
@@ -863,10 +881,10 @@ if [ "$DOWNLOAD" ]; then
 
 	eval echo -e "Calling: wget -cq \"${URL_REPO}/${NAME}.${EXT_BLDR}\" -O \"./${NAME}.${EXT_BLDR}\"" >>"$LOG"
 	( eval wget -cq "${URL_REPO}/${NAME}.${EXT_BLDR}" -O "./${NAME}.${EXT_BLDR}" 2>&1 | tee -a "$LOG" | grep -q 404 ) && {
-		echo "ERROR: The package builder profile download failed (${NAME}.${EXT_BLDR})." | tee -a "$LOG"
+		eval echo "\"ERROR: The package builder profile download failed (${NAME}.${EXT_BLDR}).\"" | tee -a "$LOG"
 		return 1
 	}
-	[ ! "$INSTALL" ] && exit 0				# if we're not also installing the profile, then we need to exit
+	[ ! "$INSTALL" ] && exit 0								# if we're not also installing the profile, then we need to exit
 fi
 
 # NOTE: these have to be two separate 'if' statements so ONLY these two can be chained together!
@@ -874,17 +892,18 @@ fi
 if [ "$INSTALL" ]; then
 	echo -e "\nInstalling the requested builder profile..." | tee -a "$LOG"
 
+	[ -e "${DIR_PROF}/${NAME}" ] && {							# check that the directory name does NOT already exist in the profile listings
+		echo "ERROR: A profile with that name already exists. Either rename or delete it."
+		echo "       The existing profile is: ${DIR_PROF}/${NAME}"
+		exit 1
+	}
+
+	eval EXT_BLDR="\"$EXT_BLDR\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
 	( ! echo "$NAME" | grep -q "$EXT_BLDR"$ ) && NAME="${NAME}.${EXT_BLDR}"			# if the file extension is not part of the NAME value, add it now (e.g. the -d and -i actions were combined)
 
 	[ ! -e "$NAME" ] && {
 		echo "ERROR: No file exists with that name. If a prior attempt failed, then the"
 		echo "       filename has probably changed."
-		exit 1
-	}
-
-	[ -e "${DIR_PROF}/${NAME}" ] && {							# check that that name does NOT already exist in the profile listings
-		echo "ERROR: A profile with that name already exists. Either rename or delete it."
-		echo "       The existing profile is: ${DIR_PROF}/${NAME}"
 		exit 1
 	}
 
@@ -940,15 +959,19 @@ elif [ "$TEMPLATE" ]; then
 		echo "file:		path/to/file/filename.tgz" >>"${DIR_TEMP}/${NAME}.info"
 		echo "clone:		.git" >>"${DIR_TEMP}/${NAME}.info"
 		echo "repo:		http://distro.com/path/to/repo" >>"${DIR_TEMP}/${NAME}.info"
-		echo "package:	example-1.2.3.soft" >>"${DIR_TEMP}/${NAME}.info"
-		echo "source:		example-1.2.3.${EXT_CODE}" >>"${DIR_TEMP}/${NAME}.info"
-		echo "builder:	example-1.2.3.${EXT_BLDR}" >>"${DIR_TEMP}/${NAME}.info"
-		echo "compile:	example-1.2.3.${EXT_MAKE}" >>"${DIR_TEMP}/${NAME}.info"
+		echo -n "package:	" >>"${DIR_TEMP}/${NAME}.info"
+		eval echo "example-1.2.3.${EXT_SOFT}" >>"${DIR_TEMP}/${NAME}.info"
+		echo -n "source:		" >>"${DIR_TEMP}/${NAME}.info"
+		eval echo "example-1.2.3.${EXT_CODE}" >>"${DIR_TEMP}/${NAME}.info"
+		echo -n "builder:	" >>"${DIR_TEMP}/${NAME}.info"
+		eval echo "example-1.2.3.${EXT_BLDR}" >>"${DIR_TEMP}/${NAME}.info"
+		echo -n "compile:	" >>"${DIR_TEMP}/${NAME}.info"
+		eval echo "example-1.2.3.${EXT_MAKE}" >>"${DIR_TEMP}/${NAME}.info"
 		echo "size:		100K" >>"${DIR_TEMP}/${NAME}.info"
 		echo "installed:	150K" >>"${DIR_TEMP}/${NAME}.info"
 		echo "category:	system	# education|games|multimedia|productivity|social|system|utilities" >>"${DIR_TEMP}/${NAME}.info"
 		echo "interface:	gui	# cli|gui" >>"${DIR_TEMP}/${NAME}.info"
-		echo "toolkit:	gtk2	# [CLI] shell|lua|ruby|php|python|tcl|tk|...  [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"
+		echo "toolkit:	gtk2	# none  [CLI] shell|lua|ruby|php|python|tcl|tk|...  [GUI] fltk|gtk|html|qt|wxWidgets|..." >>"${DIR_TEMP}/${NAME}.info"
 		echo "rating:		g	# g|pg|pg-13|nc-17|r" >>"${DIR_TEMP}/${NAME}.info"
 		echo "license:	LGPLv2.1" >>"${DIR_TEMP}/${NAME}.info"
 		echo "document:	https://www.gnu.org/licenses/lgpl-2.1.en.html" >>"${DIR_TEMP}/${NAME}.info"
@@ -1323,18 +1346,20 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"			# apply package name trimming beforehand
 		[ ! "$TRIM" ] && TEMP="$NAME"
 		TEMP="$(echo "$URL_INFO" | sed "s/\${NAME}/$TEMP/g")"				# make name substitution in the URL (e.g. liba52 > a52)
-		if [ -e "$(eval echo ${TEMP##*/})" ]; then					# if the .info file is already downloaded (to prevent an error below), then...
-			TEMP="$(eval echo ${TEMP##*/})"						#   store that filename
+		eval TEMP="$TEMP"								# eval the TEMP value to fill any variables
+		if [ -e "$(echo ${TEMP##*/})" ]; then						# if the .info file is already downloaded (to prevent an error below), then...
+			TEMP="$(echo ${TEMP##*/})"						#   store that filename
 		else										# otherwise
-			eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
-			eval wget "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
-			TEMP="${URL_INFO##*/}"							#   store the filename that was just downloaded
+			echo "Calling: wget -cq \"$TEMP\"" >>"$LOG"
+			wget -cq "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
+			TEMP="${TEMP##*/}"							#   store the filename that was just downloaded
 		fi
-		if [ ! -e "$(grep -e ^'package:' "${TEMP}" | sed 's/.*:\t//')" ]; then
-			TEMP="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"		# grep out the meaningful lines and combine to produce a valid download URL
-			echo "Calling: wget \"$TEMP\"" >>"$LOG"
-			wget "$TEMP" 2>>"$LOG" || stop failed
-		fi
+# REMOVED 2026/03/11 - this is performed in a different step
+#		if [ ! -e "$(grep -e ^'builder:' "${TEMP}" | sed 's/.*:\t//')" ]; then		# now obtain the builder profile
+#			TEMP="$(grep -i -e ^'repo:' -e ^'builder:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"		# grep out the meaningful lines and combine to produce a valid download URL
+#			echo "Calling: wget \"$TEMP\"" >>"$LOG"
+#			wget "$TEMP" 2>>"$LOG" || stop failed
+#		fi
 		ARCH="$OARCH"									# restore the prior value
 		unset $OARCH									# get rid of that variable
 
@@ -1342,52 +1367,64 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		if [ "$WGET" = 'dev' ]; then
 			if ( grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | grep -qE ^'(ht|f)tp' ); then				# if the 'download' value is not a continuation of the 'homepage', then it's the entire URL so...
 				URL_CODE="$(grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//')"
-			elif ( grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ); then							# otherwise it is has a value and is a continuation, then append it to 'homepage'...
+			elif [ "$(grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]*//')" ]; then						# otherwise it is has a value and is a continuation, then append it to 'homepage'...
 				URL_CODE="$(grep -i -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			fi
 			[ ! "$URL_CODE" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		elif [ "$WGET" = 'git' ]; then
 			# if there's a 'file' value, then...
-			( grep -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ) && GIT_REPO="$(grep -i -e ^'git:' -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
-			[ ! "$GIT_REPO" ] && ( grep -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ) && GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			[ "$(grep -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]*//')" ] && GIT_REPO="$(grep -i -e ^'git:' -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			# NOTE: we do NOT check if 'clone:' has a value since it may not
+			[ ! "$GIT_REPO" ] && GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$GIT_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		elif [ "$WGET" = 'repo' ]; then
-			# if there's a 'package' value, then...
-			( grep -e ^'package:' "${TEMP}" | sed -r 's/^.*:[\t]*//' ) && URL_REPO="$(grep -i -e ^'repo:' -e ^'package:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
+			# if there's a 'source' value, then...
+			[ "$(grep -e ^'source:' "${TEMP}" | sed -r 's/^.*:[\t]*//')" ] && URL_REPO="$(grep -i -e ^'repo:' -e ^'source:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$URL_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
 		fi
 	fi
 
 	echo -e "\nObtaining source code..." | tee -a "$LOG"
-
+	eval EXT_CODE="\"$EXT_CODE\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
+echo "01 |$TYPE|"
 	[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"				# apply the trim beforehand
 	[ ! "$TRIM" ] && TEMP="$NAME"
-	if ( [ "$WGET" != 'git' ] && [ -e "$(eval echo ${TEMP}${EXT_CODE})" ] ) || ( ["$WGET" = 'git' ] && [ -e ".git" ] ); then		# if the source code is already present, then...
+	if ( [ "$WGET" != 'git' ] && [ -e "$(eval echo ${TEMP}${EXT_CODE})" ] ) || ( [ "$WGET" = 'git' ] && [ -e ".git" ] ); then		# if the source code is already present, then...
 		echo "ERROR: The source code is already present and needs to be moved or deleted."
 		stop failed
 	fi											# otherwise lets get it!
-
+echo 02
 	[ "$WGET" = 'dir' ] && {
-		[ ! -e "${DIR_REPO}/${TEMP}${EXT_CODE}" ] && [ ! -e "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ] && { echo -e "ERROR: The source code does not exist in the specified location." && stop failed; }
+echo dir
 
-		if [ -e "${DIR_REPO}/${TEMP}${EXT_CODE}" ]; then
-			echo "Calling: cp \"${DIR_REPO}/${TEMP}${EXT_CODE}\" ./" >>"$LOG"
-			cp "${DIR_REPO}/${TEMP}${EXT_CODE}" ./ 2>>"$LOG" || stop failed
-		fi
-		if [ -e "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ]; then
-			echo "Calling: cp \"${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}\" ./" >>"$LOG"
-			cp "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ./ 2>>"$LOG" || stop failed
-		fi
+# LEFT OFF - we need to update the manpage for '-C dir'
+
+# UPDATED 2026/03/11 - the checks and everything are already done above
+#		[ ! -e "${DIR_REPO}/${TEMP}${EXT_CODE}" ] && [ ! -e "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ] && { echo -e "ERROR: The source code does not exist in the specified location." && stop failed; }
+#
+#		if [ -e "${DIR_REPO}/${TEMP}${EXT_CODE}" ]; then
+#			echo "Calling: cp \"${DIR_REPO}/${TEMP}${EXT_CODE}\" ./" >>"$LOG"
+#			cp "${DIR_REPO}/${TEMP}${EXT_CODE}" ./ 2>>"$LOG" || stop failed
+#		fi
+#		if [ -e "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ]; then
+#			echo "Calling: cp \"${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}\" ./" >>"$LOG"
+#			cp "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ./ 2>>"$LOG" || stop failed
+#		fi
+
+		echo "Calling: cp \"${DIRECTORY}\" ./" >>"$LOG"
+		cp "${DIRECTORY}" ./ 2>>"$LOG" || stop failed
 	}
 	[ "$WGET" = 'dev' ] && {
+echo dev
 		TEMP="$(echo "$URL_CODE" | sed "s/\${NAME}/${TEMP}/g")"
-		eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
-		eval wget "$TEMP" 2>>"$LOG" || stop failed
+		eval echo "Calling: wget -cq \"$TEMP\"" >>"$LOG"
+		eval wget -cq "$TEMP" 2>>"$LOG" || stop failed
 	}
 	[ "$WGET" = 'git' ] && {
+echo git
 		if ( echo "$GIT_REPO" | grep -qE '(tgz|zip)'$ ); then				# if the git link is a distributable file, then...
-			eval echo "Calling: wget \"$GIT_REPO\"" >>"$LOG"
-			eval wget "$GIT_REPO" 2>>"$LOG" || stop failed				#   download it
+			eval echo "Calling: wget -cq \"$GIT_REPO\"" >>"$LOG"
+			eval wget -cq "$GIT_REPO" 2>>"$LOG" || stop failed			#   download it
 			WGET='git2'								#   temporarily change the value so the below uncompression code can run
 		else										# otherwise, we have a git repo to clone, so...
 			TEMP="$(echo "$GIT_REPO" | sed "s/\${NAME}/$TEMP/g")"
@@ -1396,12 +1433,17 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		fi
 	}
 	[ "$WGET" = 'repo' ] && {
-		TEMP="$(echo "${URL_REPO}/${NAME}.${EXT_CODE}" | sed "s/\${NAME}/$TEMP/g")"
-		eval echo "Calling: wget \"$TEMP\"" >>"$LOG"
-		eval wget "$TEMP" 2>>"$LOG" || stop failed
+echo "repo |$TEMP|$URL_REPO|"
+		TEMP="$(echo "${URL_REPO}" | sed "s/\${NAME}/$TEMP/g")"
+echo "temp1 |$TEMP|$TYPE|"
+		( echo "$TEMP" | grep -q "${NAME}.${EXT_CODE}"$ ) || TEMP="${TEMP}/${NAME}.${EXT_CODE}"						# if the URL_REPO was not assigned via -I above, then we need to append the filename to the URL
+echo "temp2 |$TEMP|"
+		eval echo "Calling: wget -cq \"${TEMP}\"" >>"$LOG"
+		eval wget -cq "${TEMP}" 2>>"$LOG" || stop failed
 	}
-
+echo 03
 	if [ "$WGET" != 'git' ]; then								# if we're not cloing a git repo (since it would already be uncompressed files), then...
+echo inside
 		TEMP="$(ls -1t | head -1)"							#    store the filename that was just downloaded
 		echo "Source Code File: $TEMP" >>"$LOG"
 		case $(file -b --mime-type "$TEMP") in
@@ -1414,12 +1456,14 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		esac
 		[ "$WGET" = 'git2' ] && WGET='git'						#    if the value had been temporarily changed above, we now need to change it back
 	fi
+echo 04
 	echo -e "Detected:\n$(ls -tdpr -- * | grep '/'$)" >>"$LOG"
-	echo "Calling: cd \"$(ls -tdr -- * | grep '/'$ | head -1)\"" >>"$LOG"
+	echo "Calling: cd \"$(ls -tdpr -- * | grep '/'$ | head -1)\"" >>"$LOG"
 	cd "$(ls -tdpr -- * | grep '/'$ | head -1)" 2>>"$LOG" || {				# change into the (unknown named) directory created by the copy/clone/uncompression above (source code directory)	https://unix.stackexchange.com/questions/136976/get-the-latest-directory-not-the-latest-file
 		echo "ERROR: The source code directory could not be entered." >>"$LOG"
 		stop failed
 	}
+echo 05
 	# NOTE: we are now in the correct directory to perform all the following actions
 
 elif [ "$CODE" ]; then										# if we have a CODE value, then we need to change into that directory before we continue!

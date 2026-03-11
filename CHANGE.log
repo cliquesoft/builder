@@ -188,3 +188,20 @@
 - Began testing the project
 - Updated the --help output
 
+2026/03/11
+- Replaced 'package' with 'source' when WGET='repo'
+- Removed the eval code for the EXT_ variables
+- Removed a block of code that was downloading the repo package with -I
+- Removed 'clone:' value checking with -I and '-C git'
+- Rearranged the NAME update with the -i action
+- Updated the URL processing when WGET='repo'
+- Updated value checks with -I
+- Updated the output with '-t info' to be formatted correctly
+- Updated the 'stop proper' call to delete the contents of DIR
+- Updated the existing '-C dev' error message to activate without -I
+- Updated the DIRECTORY value to be mandatory with '-C dir'
+- Updated the man page
+
+- Tested with TinyCore Linux
+
+
