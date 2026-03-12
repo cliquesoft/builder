@@ -202,6 +202,14 @@
 - Updated the DIRECTORY value to be mandatory with '-C dir'
 - Updated the man page
 
-- Tested with TinyCore Linux
-
+2026/03/12
+- Cleaned up commented out code
+- Added the -S and -T options to parameter processing blocks
+- Added the -u action
+- Updated an erroneous return call for the -d action
+- Updated the verbiage for the -d and -i actions
+- Updated the mime type checking to optionally include a preceeding 'x-'
+- Updated to allow -d, -i, and {-b|-c} in a single call
+- Updated the man page
+- Updated the --help output
 

@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/11 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/12 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -131,6 +131,7 @@ COMPILE=''							# indicates that NO packaging should take place, only a softwar
 PROFILE=''							# create a builder profile
 REPACK=''							# indicates that we just need to repack the software since something in the 'include' directories changed
 TEMPLATE=''							# creates a blank builder profile template and exit
+UNINSTALL=''							# indicates we need to uninstall the builder profile
 
 # [options]
 export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
@@ -503,9 +504,10 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 # VER2 - for every -C value that's filled out, this can sync the software with each of those sources with a single command
 #	echo "	-s   sync source code to all configured locations"
 	echo "	-t   create a package template: all, info, profile"
+	echo "	-u   uninstall the builder profile"
 # VER2 - check for updates to software via git or website; also allow this to be setup via cron to automatically check
 #	if the (homepage) link is not present (since it would change to a different filename), there's an update
-#	echo "	-u   checks for updated versions of software"
+#	echo "	-v   checks for updated versions of software"
 	echo
 	echo "	--help      shows this screen"
 	echo "	--install   installs the ${THIS##*/} software"
@@ -541,13 +543,13 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	2. builder -i NAME /location/of/builder/profile"
 	echo "	3. builder -{bc} NAME /package/source/code/directory"
 	echo "	   NOTES:"
-	echo "	   - steps 1 and 2 can be combined with 'builder -d -i ...'"
+	echo "	   - each step can be combined into one call 'builder -{b|c} -d -i ...'"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
 	echo "	   - to create a distributable software package, use the -b switch"
 	echo "	   - to only compile the software (end user), pass the -c switch"
 	echo
 	echo "  Profile Creation Steps:                          [developer/package creator]"
-	echo "	 1. Use (or create) a 'config' in ${DIR_CONF} (or ~/.$(echo "${DIR_CONF}" | sed 's/^.//'))"
+	echo "	 1. Use (or create) a 'config' in ${DIR_CONF} (or alt dir)"
 	echo "	 2. Run: builder -t info NAME"
 	echo "	 3. Fill out ${DIR_TEMP}/NAME.info"
 	echo "	 4. Run: builder -t profile NAME"
@@ -621,7 +623,7 @@ elif [ "$1" = '--version' ]; then
 	exit 0
 else
 	TEMP=0
-	while getopts A:bcC:dDeFiIM:N:pPrR:St:T:U OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
+	while getopts A:bcC:dDeFiIM:N:pPrR:St:T:uU OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -663,6 +665,7 @@ else
 				exit 1
 			   }
 			   TYPE="$OPTARG" ;;
+			u) UNINSTALL='TRUE' ;;
 			U) UNLOAD='TRUE' ;;
 			*) exit 1 ;;				# NOTE: since 'getopts' presents it own error, we don't need to do so here
 		esac
@@ -714,9 +717,11 @@ TEMP=0
 [ "$PROFILE" ] && TEMP=$(( TEMP + 1 ))
 [ "$REPACK" ] && TEMP=$(( TEMP + 1 ))
 [ "$TEMPLATE" ] && TEMP=$(( TEMP + 1 ))
-[ $TEMP -eq 2 ] && [ "$DOWNLOAD" ] && [ "$INSTALL" ] && TEMP=1	# if the -d and -i were chained, that is permissible, any other chained actions are not!
-[ $TEMP -gt 1 ] && { echo "ERROR: Include only one ACTION when executing this script."; exit 1; }
+[ "$UNINSTALL" ] && TEMP=$(( TEMP + 1 ))
+[ $TEMP -gt 1 ] && [ ! "$PROFILE" ] && [ ! "$REPACK" ] && [ ! "$TEMPLATE" ] && [ ! "$UNINSTALL" ] && TEMP=1					# if the -d, -i, and -{b|c} were chained, that is permissible, any other chained actions are not!
+[ $TEMP -gt 1 ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
+[ "$BUILD" ] && [ "$COMPILE" ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }				# just in case '-b -c ...' was passed (which will pass the first test above)
 
 # option checking
 [ "$ARCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -A option can't be used with this action."; exit 1; }
@@ -772,23 +777,15 @@ eval LOG="\"$LOG\""						# NOTE: this has to be in this fashion so the dash in t
 if [ ! "$TEMPLATE" ]; then
 	eval DIR_DUMP="$DIR_DUMP"
 	eval DIR_INST="$DIR_INST"
-	[ ! "$INSTALL" ] && eval DIR_PROF="${DIR_PROF}/${NAME}"	# if we aren't installing a profile, then append the NAME value to the variable
+# REMOVED 2026/03/12
+#	[ ! "$INSTALL" ] && eval DIR_PROF="${DIR_PROF}/${NAME}"	# if we aren't installing a profile, then append the NAME value to the variable
 	eval DIR_REPO="$DIR_REPO"
 	eval DIR_TEMP="$DIR_TEMP"
 
-# REMOVED 2026/03/11 - these need to be interpritted at different times
-#	eval EXT_BLDR="\"$EXT_BLDR\""				# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
-#	eval EXT_CODE="\"$EXT_CODE\""
-#	eval EXT_DEPS="\"$EXT_DEPS\""
-#	eval EXT_HASH="\"$EXT_HASH\""
-#	eval EXT_INFO="\"$EXT_INFO\""
-#	eval EXT_LIST="\"$EXT_LIST\""
-#	eval EXT_MAKE="\"$EXT_MAKE\""
-#	eval EXT_SOFT="\"$EXT_SOFT\""
-#	eval EXT_BIND="\"$EXT_BIND\""
-
 	eval URL_CODE="$URL_CODE"
 	eval URL_INFO="$URL_INFO"
+
+	# NOTE: we can't eval the EXT_ variables here since they need to be interpritted at different times
 fi
 
 [ "$ARCH" = 'a32' ] && EXPORTS="$FLAG_A32"
@@ -818,8 +815,8 @@ fi
 touch "${LOG%/*}/writable" >/dev/null 2>&1 || { showMsg 'failure' "The logs directory ($LOG%/*}) is not writable." 'screen'; exit 1; }
 rm "${LOG%/*}/writable" >/dev/null 2>&1
 
-if [ ! -d "$DIR_PROF" ]; then
-	mkdir -p "$DIR_PROF" >/dev/null 2>&1 || { echo "ERROR: The profile cache directory (DIR_PROF) does not exist and could not be created."; exit 1; }
+if [ ! -d "${DIR_PROF}" ]; then
+	mkdir -p "${DIR_PROF}" >/dev/null 2>&1 || { echo "ERROR: The profile cache directory (DIR_PROF) does not exist and could not be created."; exit 1; }
 fi
 touch "${DIR_PROF}/writable" >/dev/null 2>&1 || { echo "ERROR: The profile cache directory (DIR_PROF) is not writable."; exit 1; }
 rm "${DIR_PROF}/writable" >/dev/null 2>&1
@@ -864,6 +861,8 @@ fi
 
 if [ "$DIRECTORY" ]; then									# if DIRECTORY was passed, then...
 	[ "$TEMPLATE" ] && DIR_TEMP="$DIRECTORY"						#   if we're creating a template, then we need to change this variable value so the below code works correctly
+	[ "$UNINSTALL" ] && DIR_PROF="$DIRECTORY"						#   if we're uninstalling a profile, then we need to change this variable value so the below code works correctly
+
 	[ "$PROFILE" ] && { cd "${DIRECTORY}/.." >/dev/null || exit 1; }			#   if we're creating a builder profile...		NOTE: this goes one level up from the passed DIRECTORY value
 	[ ! "$PROFILE" ] && [ "$WGET" != 'dir' ] && { cd "$DIRECTORY" >/dev/null || exit 1; }	#   for any other action (that doesn't involve '-C dir'), change into the DIRECTORY
 else												# otherwise it was NOT passed, so...
@@ -877,54 +876,66 @@ fi
 # PROCESS THE ACTIONS
 
 if [ "$DOWNLOAD" ]; then
-	echo -e "\nDownloading the requested builder profile..." | tee -a "$LOG"
+	echo -n "Downloading the requested builder profile:" | tee -a "$LOG"
 
-	eval echo -e "Calling: wget -cq \"${URL_REPO}/${NAME}.${EXT_BLDR}\" -O \"./${NAME}.${EXT_BLDR}\"" >>"$LOG"
-	( eval wget -cq "${URL_REPO}/${NAME}.${EXT_BLDR}" -O "./${NAME}.${EXT_BLDR}" 2>&1 | tee -a "$LOG" | grep -q 404 ) && {
-		eval echo "\"ERROR: The package builder profile download failed (${NAME}.${EXT_BLDR}).\"" | tee -a "$LOG"
-		return 1
-	}
+	eval EXT_BLDR="\"$EXT_BLDR\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
+
+	if [ -e "${NAME}.${EXT_BLDR}" ]; then
+		echo " [exists]" | tee -a "$LOG"
+	else
+		( eval wget -cq "${URL_REPO}/${NAME}.${EXT_BLDR}" -O "./${NAME}.${EXT_BLDR}" 2>&1 | sed 's/^w/ \[failure\]\nw/' | tee -a "$LOG" | grep -q ^'wget' ) && {
+			eval echo -e "Calling: wget -cq \"${URL_REPO}/${NAME}.${EXT_BLDR}\" -O \"./${NAME}.${EXT_BLDR}\"" >>"$LOG"
+			eval echo "\"ERROR: The package builder profile download failed (${NAME}.${EXT_BLDR}).\"" >>"$LOG"
+			stop failed
+		}
+		echo " [done]" | tee -a "$LOG"
+	fi
 	[ ! "$INSTALL" ] && exit 0								# if we're not also installing the profile, then we need to exit
 fi
 
-# NOTE: these have to be two separate 'if' statements so ONLY these two can be chained together!
+# NOTE: these have to be separate 'if' statements so ONLY these two can be chained with others!
 
 if [ "$INSTALL" ]; then
-	echo -e "\nInstalling the requested builder profile..." | tee -a "$LOG"
+	echo -n "Installing the requested builder profile:" | tee -a "$LOG"
 
 	[ -e "${DIR_PROF}/${NAME}" ] && {							# check that the directory name does NOT already exist in the profile listings
-		echo "ERROR: A profile with that name already exists. Either rename or delete it."
-		echo "       The existing profile is: ${DIR_PROF}/${NAME}"
-		exit 1
+		echo " [failure]" | tee -a "$LOG"
+		echo "ERROR: A profile with that name already exists. Either rename or delete it." >>"$LOG"
+		echo "       The existing profile is: ${DIR_PROF}/${NAME}" >>"$LOG"
+		stop failed
 	}
 
 	eval EXT_BLDR="\"$EXT_BLDR\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
-	( ! echo "$NAME" | grep -q "$EXT_BLDR"$ ) && NAME="${NAME}.${EXT_BLDR}"			# if the file extension is not part of the NAME value, add it now (e.g. the -d and -i actions were combined)
+# REMOVED 2026/03/12
+#	( ! echo "$NAME" | grep -q "$EXT_BLDR"$ ) && NAME="${NAME}.${EXT_BLDR}"			# if the file extension is not part of the NAME value, add it now (e.g. the -d and -i actions were combined)
 
-	[ ! -e "$NAME" ] && {
-		echo "ERROR: No file exists with that name. If a prior attempt failed, then the"
-		echo "       filename has probably changed."
-		exit 1
+	[ ! -e "${NAME}.${EXT_BLDR}" ] && {
+		echo " [failure]" | tee -a "$LOG"
+		echo "ERROR: No file exists with that name. If a prior attempt failed, then the" >>"$LOG"
+		echo "       filename has probably changed." >>"$LOG"
+		stop failed
 	}
 
-	if [ "$(file -b --mime-type "$NAME")" = 'application/x-gzip' ]; then			# if the profile has been checked and does not exist, then...
-		echo "Calling: tar -xzf \"$NAME\" -C \"$DIR_PROF\"" >>"$LOG"
-		tar -xzf "$NAME" -C "$DIR_PROF" 2>>"$LOG" || {
+	if ( file -b --mime-type "${NAME}.${EXT_BLDR}" | grep -q 'application/[x\-]*gzip' ); then # if the profile has been checked and does not exist, then...
+		tar -xzf "${NAME}.${EXT_BLDR}" -C "$DIR_PROF" 2>>"$LOG" || {
+			echo " [failure]" | tee -a "$LOG"
+			echo "Calling: tar -xzf \"${NAME}.${EXT_BLDR}\" -C \"$DIR_PROF\"" >>"$LOG"
 			echo "ERROR: The builder profile could not be installed." >>"$LOG"
 			stop failed
 		}
 	else											# NOTE: this is a safety-net in case something is wrong with the file
+		echo " [failure]" | tee -a "$LOG"
 		echo "ERROR: The builder profile appears to be the wrong format." >>"$LOG"
-		exit 1
+		stop failed
 	fi
+	echo " [done]" | tee -a "$LOG"
 
-	echo
-	echo "The profile has been installed successfully!"
-	echo
-	exit 0
+	[ ! "$BUILD" ] && [ ! "$COMPILE" ] && exit 0						# if we're not also building or compiling, then we need to exit
+fi
 
+# NOTE: these have to be separate 'if' statements so ONLY these two can be chained with others!
 
-elif [ "$PROFILE" ]; then
+if [ "$PROFILE" ]; then
 	[ ! -d "$NAME" ] && {
 		echo "ERROR: No directory exists with that name."
 		exit 1
@@ -1202,12 +1213,48 @@ elif [ "$TEMPLATE" ]; then
 		echo "#FLAG_R64=\"${FLAG_R64}\"			# RPi 64bit" >>config
 		echo "#FLAG_V32=\"\"				# RISC-V 32bit" >>config
 		echo "#FLAG_V64=\"\"				# RISC-V 64bit" >>config
+		echo >>config
+		echo "# If you wish to override the system defaults for this package, add the variables here:" >>config
 
 		echo
 		echo "The template builder profile has been successfully created! It can be found at:"
 		echo "  ${DIR_TEMP}/${NAME}"
 		echo
 	fi
+	exit 0
+
+
+elif [ "$UNINSTALL" ]; then
+	echo -n "Uninstalling the requested builder profile:" | tee -a "$LOG"
+
+	eval EXT_BLDR="\"$EXT_BLDR\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
+
+	echo -n " [file]" | tee -a "$LOG"
+	if [ ! -e "${DIR_PROF}/${NAME}.${EXT_BLDR}" ]; then
+		echo -n " [absent]" | tee -a "$LOG"
+		echo -n " [ ! -e \"${DIR_PROF}/${NAME}.${EXT_BLDR}\" ]" >>"$LOG"
+	else
+		echo -n " [exists]" | tee -a "$LOG"
+		( rm "${DIR_PROF}/${NAME}.${EXT_BLDR}" 2>&1 | sed 's/^r/ \[failure\]\nr/' | tee -a "$LOG" | grep -q ^'rm: ' ) && {
+			eval echo -e "Calling: rm \"${DIR_PROF}/${NAME}.${EXT_BLDR}\"" >>"$LOG"
+			eval echo "\"ERROR: The package builder profile deletion failed (${NAME}.${EXT_BLDR}).\"" >>"$LOG"
+			stop failed
+		}
+	fi
+
+	echo -n " [profile]" | tee -a "$LOG"
+	if [ ! -d "${DIR_PROF}/${NAME}" ]; then							# check that the directory name does exist in the profile listings
+		echo -n " [absent]" | tee -a "$LOG"
+		echo -n " [ ! -d \"${DIR_PROF}/${NAME}\" ]" >>"$LOG"
+	else
+		echo -n " [exists]" | tee -a "$LOG"
+		( rm -Rf "${DIR_PROF}/${NAME}" 2>&1 | sed 's/^r/ \[failure\]\nr/' | tee -a "$LOG" | grep -q ^'rm: ' ) && {
+			eval echo -e "Calling: rm -Rf \"${DIR_PROF}/${NAME}\"" >>"$LOG"
+			eval echo "\"ERROR: The package builder profile deletion failed (${NAME}).\"" >>"$LOG"
+			stop failed
+		}
+	fi
+	echo " [done]" | tee -a "$LOG"
 	exit 0
 
 
@@ -1226,11 +1273,12 @@ if [ "$ARCH" = 'all' ]; then					# if we need to compile all architectures, then
 		TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
 		[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 		[ "$DIRS" ] && TEMP="$TEMP -D"
-		[ "$PASS" ] && TEMP="$TEMP -N '$PASS'"
+		[ "$PASS" ] && TEMP="$TEMP -N $PASS"
 		[ "$PATCH" ] && TEMP="$TEMP -P"
 		[ "$SKIP" ] && TEMP="$TEMP -F"
 		[ "$SINGLE" ] && TEMP="$TEMP -S"
 		[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
+		[ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
 		[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
 
 		eval $TEMP "$NAME"
@@ -1280,7 +1328,8 @@ fi
 	echo -e "\nConfiguration during this pass..." | tee -a "$LOG"
 	echo "   ARCH: $ARCH" | tee -a "$LOG"
 	echo "   DIRS: $DIRS" | tee -a "$LOG"
-	echo "   NAME: $NAME" | tee -a "$LOG"
+	echo -n "   NAME: $NAME [" | tee -a "$LOG"
+	eval echo "${EXT_MAKE}]" | tee -a "$LOG"
 	echo "   PASS: $PASS" | tee -a "$LOG"
 	echo "   SKIP: $SKIP" | tee -a "$LOG"
 	echo "   TRIM: $TRIM" | tee -a "$LOG"
@@ -1305,9 +1354,12 @@ fi
 	echo "   DIR_REPO: $DIR_REPO" | tee -a "$LOG"
 	echo "   DIR_TEMP: $DIR_TEMP" | tee -a "$LOG"
 	echo | tee -a "$LOG"
-	echo "   URL_CODE: $URL_CODE" | tee -a "$LOG"
-	echo "   URL_REPO: $URL_REPO" | tee -a "$LOG"
-	echo "   URL_INFO: $URL_INFO" | tee -a "$LOG"
+	echo -n "   URL_CODE: " | tee -a "$LOG"
+	eval echo "$URL_CODE" | tee -a "$LOG"
+	echo -n "   URL_REPO: " | tee -a "$LOG"
+	eval echo "$URL_REPO" | tee -a "$LOG"
+	echo -n "   URL_INFO: " | tee -a "$LOG"
+	eval echo "$URL_INFO" | tee -a "$LOG"
 	echo | tee -a "$LOG"
 	echo "   EXPORTS:" | tee -a "$LOG"
 	echo "$EXPORTS" | sed 's/^[ \t]*/   /' | tee -a "$LOG"
@@ -1354,12 +1406,6 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 			wget -cq "$TEMP" 2>>"$LOG" || stop failed				#   download the proper .info file to get the download location and filename
 			TEMP="${TEMP##*/}"							#   store the filename that was just downloaded
 		fi
-# REMOVED 2026/03/11 - this is performed in a different step
-#		if [ ! -e "$(grep -e ^'builder:' "${TEMP}" | sed 's/.*:\t//')" ]; then		# now obtain the builder profile
-#			TEMP="$(grep -i -e ^'repo:' -e ^'builder:' "${TEMP}" | sed -r 's/.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"		# grep out the meaningful lines and combine to produce a valid download URL
-#			echo "Calling: wget \"$TEMP\"" >>"$LOG"
-#			wget "$TEMP" 2>>"$LOG" || stop failed
-#		fi
 		ARCH="$OARCH"									# restore the prior value
 		unset $OARCH									# get rid of that variable
 
@@ -1385,43 +1431,26 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 	fi
 
 	echo -e "\nObtaining source code..." | tee -a "$LOG"
+
 	eval EXT_CODE="\"$EXT_CODE\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
-echo "01 |$TYPE|"
+
 	[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"				# apply the trim beforehand
 	[ ! "$TRIM" ] && TEMP="$NAME"
 	if ( [ "$WGET" != 'git' ] && [ -e "$(eval echo ${TEMP}${EXT_CODE})" ] ) || ( [ "$WGET" = 'git' ] && [ -e ".git" ] ); then		# if the source code is already present, then...
 		echo "ERROR: The source code is already present and needs to be moved or deleted."
 		stop failed
 	fi											# otherwise lets get it!
-echo 02
+
 	[ "$WGET" = 'dir' ] && {
-echo dir
-
-# LEFT OFF - we need to update the manpage for '-C dir'
-
-# UPDATED 2026/03/11 - the checks and everything are already done above
-#		[ ! -e "${DIR_REPO}/${TEMP}${EXT_CODE}" ] && [ ! -e "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ] && { echo -e "ERROR: The source code does not exist in the specified location." && stop failed; }
-#
-#		if [ -e "${DIR_REPO}/${TEMP}${EXT_CODE}" ]; then
-#			echo "Calling: cp \"${DIR_REPO}/${TEMP}${EXT_CODE}\" ./" >>"$LOG"
-#			cp "${DIR_REPO}/${TEMP}${EXT_CODE}" ./ 2>>"$LOG" || stop failed
-#		fi
-#		if [ -e "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ]; then
-#			echo "Calling: cp \"${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}\" ./" >>"$LOG"
-#			cp "${DIR_REPO}/${TEMP}/${TEMP}${EXT_CODE}" ./ 2>>"$LOG" || stop failed
-#		fi
-
 		echo "Calling: cp \"${DIRECTORY}\" ./" >>"$LOG"
 		cp "${DIRECTORY}" ./ 2>>"$LOG" || stop failed
 	}
 	[ "$WGET" = 'dev' ] && {
-echo dev
 		TEMP="$(echo "$URL_CODE" | sed "s/\${NAME}/${TEMP}/g")"
 		eval echo "Calling: wget -cq \"$TEMP\"" >>"$LOG"
 		eval wget -cq "$TEMP" 2>>"$LOG" || stop failed
 	}
 	[ "$WGET" = 'git' ] && {
-echo git
 		if ( echo "$GIT_REPO" | grep -qE '(tgz|zip)'$ ); then				# if the git link is a distributable file, then...
 			eval echo "Calling: wget -cq \"$GIT_REPO\"" >>"$LOG"
 			eval wget -cq "$GIT_REPO" 2>>"$LOG" || stop failed			#   download it
@@ -1433,44 +1462,38 @@ echo git
 		fi
 	}
 	[ "$WGET" = 'repo' ] && {
-echo "repo |$TEMP|$URL_REPO|"
 		TEMP="$(echo "${URL_REPO}" | sed "s/\${NAME}/$TEMP/g")"
-echo "temp1 |$TEMP|$TYPE|"
 		( echo "$TEMP" | grep -q "${NAME}.${EXT_CODE}"$ ) || TEMP="${TEMP}/${NAME}.${EXT_CODE}"						# if the URL_REPO was not assigned via -I above, then we need to append the filename to the URL
-echo "temp2 |$TEMP|"
 		eval echo "Calling: wget -cq \"${TEMP}\"" >>"$LOG"
 		eval wget -cq "${TEMP}" 2>>"$LOG" || stop failed
 	}
-echo 03
+
 	if [ "$WGET" != 'git' ]; then								# if we're not cloing a git repo (since it would already be uncompressed files), then...
-echo inside
 		TEMP="$(ls -1t | head -1)"							#    store the filename that was just downloaded
 		echo "Source Code File: $TEMP" >>"$LOG"
 		case $(file -b --mime-type "$TEMP") in
 			'application/zip') unzip "$TEMP" 2>>"$LOG" ;;
-			'application/x-gzip') tar -xzf "$TEMP" 2>>"$LOG" ;;
-			'application/x-bzip2')
+			'application/gzip'|'application/x-gzip') tar -xzf "$TEMP" 2>>"$LOG" ;;
+			'application/bzip2'|'application/x-bzip2')
 				[ ! -e "${TEMP%.*}" ] && bunzip2 "$TEMP" 2>>"$LOG"		#    if the file is already uncompressed, then do so now
 				tar -xf "${TEMP%.*}" 2>>"$LOG"
 				;;
 		esac
 		[ "$WGET" = 'git2' ] && WGET='git'						#    if the value had been temporarily changed above, we now need to change it back
 	fi
-echo 04
+
 	echo -e "Detected:\n$(ls -tdpr -- * | grep '/'$)" >>"$LOG"
 	echo "Calling: cd \"$(ls -tdpr -- * | grep '/'$ | head -1)\"" >>"$LOG"
 	cd "$(ls -tdpr -- * | grep '/'$ | head -1)" 2>>"$LOG" || {				# change into the (unknown named) directory created by the copy/clone/uncompression above (source code directory)	https://unix.stackexchange.com/questions/136976/get-the-latest-directory-not-the-latest-file
 		echo "ERROR: The source code directory could not be entered." >>"$LOG"
 		stop failed
 	}
-echo 05
-	# NOTE: we are now in the correct directory to perform all the following actions
 
 elif [ "$CODE" ]; then										# if we have a CODE value, then we need to change into that directory before we continue!
 	echo -e "\nEntering source code directory..." | tee -a "$LOG"
 
-	echo -e "Detected:\n$(ls -1pd -- * | grep ^"$CODE" | grep '/'$ | head -1)" >>"$LOG"
-	TEMP="$(ls -1pd -- * | grep ^"$CODE" | grep '/'$ | head -1)"
+	echo -e "Detected:\n$(ls -1dp -- * | grep ^"$CODE" | grep '/'$ | head -1)" >>"$LOG"
+	TEMP="$(ls -1dp -- * | grep ^"$CODE" | grep '/'$ | head -1)"
 	[ ! "$TEMP" ] && {
 		echo "ERROR: The source code directory could not be found." >>"$LOG"
 		stop failed
@@ -1482,8 +1505,7 @@ elif [ "$CODE" ]; then										# if we have a CODE value, then we need to chang
 	}
 fi
 
-echo DEBUG
-exit 0
+# NOTE: we are now in the correct directory to perform all the following actions
 
 if [ "$METHOD" = 'autoconf' ] && [ ! -e 'configure.ac' ]; then
 	echo "ERROR: It does not appear that builder was called from within the source code directory." >>"$LOG"
@@ -1571,6 +1593,8 @@ fi
 	echo -e "\nExecuting the 'pre.compile' script..." | tee -a "$LOG"
 	"${DIR_PROF}/pre.compile.${PASS}" 2>>"$LOG" || stop failed
 }
+
+eval EXT_MAKE="\"$EXT_MAKE\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
 
 echo -e "\nGenerating the compile script..." | tee -a "$LOG"
 echo "#!/bin/sh" >"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
@@ -1704,6 +1728,7 @@ elif [ "$COMPILE" ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}
 		echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
 		stop failed
 	}
+# LEFT OFF - do we need this step, or does this get installed during the 'make install' call?
 	echo "Calling: $SUDO cp -dpR ./* /" >>"$LOG"
 	eval $SUDO cp -dpR ./* / 2>>"$LOG" || {							# now copy the contents to the root of the file system
 		echo "ERROR: The compiled software could not be installed." >>"$LOG"
@@ -1748,10 +1773,12 @@ fi
 	TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
 	[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
 	[ "$DIRS" ] && TEMP="$TEMP -D"
-	#[ "$PASS" ] && TEMP="$TEMP -N '$PASS'"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
+	#[ "$PASS" ] && TEMP="$TEMP -N $PASS"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
 	[ "$PATCH" ] && TEMP="$TEMP -P"
 	[ "$SKIP" ] && TEMP="$TEMP -F"
+	[ "$SINGLE" ] && TEMP="$TEMP -S"
 	[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
+	[ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
 	[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
 
 	cd "$CWDL"
