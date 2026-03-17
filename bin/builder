@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/12 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/17 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -252,7 +252,7 @@ stop() {
 				fi
 			done
 		done
-		[ -x "${DIR_PROF}/cleanup" ] && "${DIR_PROF}/cleanup" 2>>"$LOG"			# if a cleanup script has been included, execute it as well!
+		[ -x "${DIR_PROF}/${NAME}/cleanup" ] && "${DIR_PROF}/${NAME}/cleanup" 2>>"$LOG"	# if a cleanup script has been included, execute it as well!
 		( [ ! "$2" ] || [ $2 -eq 1 ] ) && exit 0
 	fi
 }
@@ -389,13 +389,13 @@ package() {
 		stop failed
 	}
 
-	[ ! "$PASS" ] && [ -x "${DIR_PROF}/pre.package" ] && {					# execute any existing final script (for single-pass; multi-pass is next block)
+	[ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/pre.package" ] && {				# execute any existing final script (for single-pass; multi-pass is next block)
 		echo -e "\nExecuting the 'pre.package' script..." | tee -a "$LOG"
-		"${DIR_PROF}/pre.package" 2>>"$LOG" || stop failed
+		"${DIR_PROF}/${NAME}/pre.package" 2>>"$LOG" || stop failed
 	}
-	[ "$PASS" ] && [ -x "${DIR_PROF}/pre.package.${PASS}" ] && {
+	[ "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/pre.package.${PASS}" ] && {
 		echo -e "\nExecuting the 'pre.package' script..." | tee -a "$LOG"
-		"${DIR_PROF}/pre.package.${PASS}" 2>>"$LOG" || stop failed
+		"${DIR_PROF}/${NAME}/pre.package.${PASS}" 2>>"$LOG" || stop failed
 	}
 
 	# store the package names that need to be processed (either NAME or directory names)	  NOTE: this has to be performed again incase additional directories were added/removed via a 'pre.package' script
@@ -444,13 +444,13 @@ package() {
 	done
 	eval $SUDO chown -hR ${USER} * >>"$LOG" 2>&1						# update the ownership of all the package contents to be the current user so we can delete it
 
-	[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.package" ] && {					# execute any existing final script (for single-pass; multi-pass is next line)
+	[ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.package" ] && {				# execute any existing final script (for single-pass; multi-pass is next line)
 		echo -e "\nExecuting the 'post.package' script..." | tee -a "$LOG"
-		"${DIR_PROF}/post.package" 2>>"$LOG" || stop failed
+		"${DIR_PROF}/${NAME}/post.package" 2>>"$LOG" || stop failed
 	}
-	[ "$PASS" ] && [ -x "${DIR_PROF}/post.package.${PASS}" ] && {
+	[ "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.package.${PASS}" ] && {
 		echo -e "\nExecuting the 'post.package' script..." | tee -a "$LOG"
-		"${DIR_PROF}/post.package.${PASS}" 2>>"$LOG" || stop failed
+		"${DIR_PROF}/${NAME}/post.package.${PASS}" 2>>"$LOG" || stop failed
 	}
 }
 
@@ -495,11 +495,16 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	${THIS##*/} [OPTIONS] ACTION NAME [DIRECTORY]"
 	echo
 	echo "  Actions:"
-	echo "	-b   build a distributable package"
-	echo "	-c   compile the software only, no packaging"
+# left off - update the man page to reflect that -b is now -b and -c
+	echo "	-b   build software: compile, package"
+# UPDATED 2026/03/17
+#	echo "	-c   compile and install the software without packaging"
+# left off - update the man page
+	echo "	-c   create a builder profile"
 	echo "	-d   download the builder profile (uses URL_REPO)"
 	echo "	-i   install the builder profile"
-	echo "	-p   create a builder profile"
+# UPDATED 2026/03/17
+#	echo "	-p   create a builder profile"
 	echo "	-r   only re-package software instead of building"
 # VER2 - for every -C value that's filled out, this can sync the software with each of those sources with a single command
 #	echo "	-s   sync source code to all configured locations"
@@ -541,12 +546,12 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "  Build Software Steps:                             [end user/package creator]"
 	echo "	1. builder -d NAME [DIRECTORY] (or download the profile manually)"
 	echo "	2. builder -i NAME /location/of/builder/profile"
-	echo "	3. builder -{bc} NAME /package/source/code/directory"
+	echo "	3. builder -b {compile|package} NAME /package/source/code/directory"
 	echo "	   NOTES:"
-	echo "	   - each step can be combined into one call 'builder -{b|c} -d -i ...'"
+	echo "	   - each step can be combined into one call 'builder -b ... -d -i ...'"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
-	echo "	   - to create a distributable software package, use the -b switch"
-	echo "	   - to only compile the software (end user), pass the -c switch"
+	echo "	   - use '-b compile' to compile and install the software (end user)"
+	echo "	   - use '-b package' to create a distributable software package"
 	echo
 	echo "  Profile Creation Steps:                          [developer/package creator]"
 	echo "	 1. Use (or create) a 'config' in ${DIR_CONF} (or alt dir)"
@@ -623,7 +628,7 @@ elif [ "$1" = '--version' ]; then
 	exit 0
 else
 	TEMP=0
-	while getopts A:bcC:dDeFiIM:N:pPrR:St:T:uU OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
+	while getopts A:b:cC:dDeFiIM:N:PrR:St:T:uU OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -636,8 +641,16 @@ else
 				exit 1
 			   }
 			   ARCH="$OPTARG" ;;
-			b) BUILD='TRUE' ;;
-			c) COMPILE='TRUE' ;;
+# UPDATED 2026/03/17
+#			b) BUILD='TRUE' ;;
+			b) ( echo "${OPTARG}" | grep -qE ^'(compile|package)'$ ) || {
+				echo "ERROR: An invalid value for '-b' was passed."
+				exit 1
+			   }
+			   BUILD="$OPTARG" ;;
+# UPDATED 2026/03/17
+#			c) COMPILE='TRUE' ;;
+			c) PROFILE='TRUE' ;;
 			C) ( echo "${OPTARG}" | grep -qE ^'(dev|dir|git|repo)'$ ) || {
 				echo "ERROR: An invalid value for '-C' was passed."
 				exit 1
@@ -650,7 +663,8 @@ else
 			I) INFOFILE='TRUE' ;;
 			M) METHOD="$OPTARG" ;;
 			N) PASS="$OPTARG" ;;
-			p) PROFILE='TRUE' ;;
+# UPDATED 2026/03/17
+#			p) PROFILE='TRUE' ;;
 			P) PATCH='' ;;
 			r) REPACK='TRUE' ;;
 			R) TRIM="$OPTARG" ;;
@@ -711,7 +725,8 @@ fi
 # action checking						  NOTE: we can't write to a log yet since those checks haven't occurred
 TEMP=0
 [ "$BUILD" ] && TEMP=$(( TEMP + 1 ))
-[ "$COMPILE" ] && TEMP=$(( TEMP + 1 ))
+# REMOVED 2026/03/17
+#[ "$COMPILE" ] && TEMP=$(( TEMP + 1 ))
 [ "$DOWNLOAD" ] && TEMP=$(( TEMP + 1 ))
 [ "$INSTALL" ] && TEMP=$(( TEMP + 1 ))
 [ "$PROFILE" ] && TEMP=$(( TEMP + 1 ))
@@ -721,21 +736,35 @@ TEMP=0
 [ $TEMP -gt 1 ] && [ ! "$PROFILE" ] && [ ! "$REPACK" ] && [ ! "$TEMPLATE" ] && [ ! "$UNINSTALL" ] && TEMP=1					# if the -d, -i, and -{b|c} were chained, that is permissible, any other chained actions are not!
 [ $TEMP -gt 1 ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
-[ "$BUILD" ] && [ "$COMPILE" ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }				# just in case '-b -c ...' was passed (which will pass the first test above)
+# REMOVED 2026/03/17
+#[ "$BUILD" ] && [ "$COMPILE" ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }				# just in case '-b -c ...' was passed (which will pass the first test above)
 
 # option checking
-[ "$ARCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -A option can't be used with this action."; exit 1; }
-[ "$WGET" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -C option can't be used with this action."; exit 1; }
-[ "$DIRS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -D option can't be used with this action."; exit 1; }
-[ ! "$SKIP" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -F option can't be used with this action."; exit 1; }
-[ "$INFOFILE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -I option can't be used with this action."; exit 1; }
+# UPDATED 2026/03/17
+#[ "$ARCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -A option can't be used with this action."; exit 1; }
+#[ "$WGET" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -C option can't be used with this action."; exit 1; }
+#[ "$DIRS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -D option can't be used with this action."; exit 1; }
+#[ ! "$SKIP" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -F option can't be used with this action."; exit 1; }
+#[ "$INFOFILE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -I option can't be used with this action."; exit 1; }
+[ "$ARCH" ] && [ ! "$BUILD" ] && { echo "The -A option can't be used with this action."; exit 1; }
+[ "$WGET" ] && [ ! "$BUILD" ] && { echo "The -C option can't be used with this action."; exit 1; }
+[ "$DIRS" ] && [ ! "$BUILD" ] && { echo "The -D option can't be used with this action."; exit 1; }
+[ ! "$SKIP" ] && [ ! "$BUILD" ] && { echo "The -F option can't be used with this action."; exit 1; }
+[ "$INFOFILE" ] && [ ! "$BUILD" ] && { echo "The -I option can't be used with this action."; exit 1; }
 [ "$INFOFILE" ] && [ ! "$WGET" ] && { echo "The -I option must be used with the -C option."; exit 1; }
-[ "$METHOD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -M option can't be used with this action."; exit 1; }
-[ "$PASS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -N option can't be used with this action."; exit 1; }
-[ ! "$PATCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -P option can't be used with this action."; exit 1; }
-[ "$TRIM" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -R option can't be used with this action."; exit 1; }
-[ "$SINGLE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -S option can't be used with this action."; exit 1; }
-[ "$UNLOAD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -U option can't be used with this action."; exit 1; }
+# UPDATED 2026/03/17
+#[ "$METHOD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -M option can't be used with this action."; exit 1; }
+#[ "$PASS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -N option can't be used with this action."; exit 1; }
+#[ ! "$PATCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -P option can't be used with this action."; exit 1; }
+#[ "$TRIM" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -R option can't be used with this action."; exit 1; }
+#[ "$SINGLE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -S option can't be used with this action."; exit 1; }
+#[ "$UNLOAD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -U option can't be used with this action."; exit 1; }
+[ "$METHOD" ] && [ ! "$BUILD" ] && { echo "The -M option can't be used with this action."; exit 1; }
+[ "$PASS" ] && [ ! "$BUILD" ] && { echo "The -N option can't be used with this action."; exit 1; }
+[ ! "$PATCH" ] && [ ! "$BUILD" ] && { echo "The -P option can't be used with this action."; exit 1; }
+[ "$TRIM" ] && [ ! "$BUILD" ] && { echo "The -R option can't be used with this action."; exit 1; }
+[ "$SINGLE" ] && [ ! "$BUILD" ] && { echo "The -S option can't be used with this action."; exit 1; }
+[ "$UNLOAD" ] && [ ! "$BUILD" ] && { echo "The -U option can't be used with this action."; exit 1; }
 [ ! "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
 if [ "$WGET" != '' ]; then
 	TEMP=''
@@ -777,8 +806,6 @@ eval LOG="\"$LOG\""						# NOTE: this has to be in this fashion so the dash in t
 if [ ! "$TEMPLATE" ]; then
 	eval DIR_DUMP="$DIR_DUMP"
 	eval DIR_INST="$DIR_INST"
-# REMOVED 2026/03/12
-#	[ ! "$INSTALL" ] && eval DIR_PROF="${DIR_PROF}/${NAME}"	# if we aren't installing a profile, then append the NAME value to the variable
 	eval DIR_REPO="$DIR_REPO"
 	eval DIR_TEMP="$DIR_TEMP"
 
@@ -906,8 +933,6 @@ if [ "$INSTALL" ]; then
 	}
 
 	eval EXT_BLDR="\"$EXT_BLDR\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
-# REMOVED 2026/03/12
-#	( ! echo "$NAME" | grep -q "$EXT_BLDR"$ ) && NAME="${NAME}.${EXT_BLDR}"			# if the file extension is not part of the NAME value, add it now (e.g. the -d and -i actions were combined)
 
 	[ ! -e "${NAME}.${EXT_BLDR}" ] && {
 		echo " [failure]" | tee -a "$LOG"
@@ -930,7 +955,18 @@ if [ "$INSTALL" ]; then
 	fi
 	echo " [done]" | tee -a "$LOG"
 
-	[ ! "$BUILD" ] && [ ! "$COMPILE" ] && exit 0						# if we're not also building or compiling, then we need to exit
+	# if we're not also building or compiling, then we need to exit
+# UPDATED 2026/03/17
+#	[ ! "$BUILD" ] && [ ! "$COMPILE" ] && exit 0
+	[ ! "$BUILD" ] && exit 0
+
+	# otherwise, load the profile configuraiton
+	[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/config" ] && . "${DIR_PROF}/${NAME}/config"
+	[ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/config.${PASS}" ] && . "${DIR_PROF}/${NAME}/config.${PASS}"
+
+	# and any switch configurations
+	[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/params" ] && . "${DIR_PROF}/${NAME}/params"
+	[ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/params.${PASS}" ] && . "${DIR_PROF}/${NAME}/params.${PASS}"
 fi
 
 # NOTE: these have to be separate 'if' statements so ONLY these two can be chained with others!
@@ -1150,6 +1186,9 @@ elif [ "$TEMPLATE" ]; then
 		echo "# NOTE: if this contains variables, still surround it with single quotes!!!" >>config
 		echo "CUSTOM=''" >>config
 		echo >>config
+		echo "# The directory where the package contents will reside in the running system" >>config
+		echo "#DIR_INST='/usr/local'" >>config
+		echo >>config
 		echo "# Uncomment any of the directory installation locations you wish to modify" >>config
 		echo "#DIR_BIN=\"\${DIR_INST}/bin\"" >>config
 		echo "#DIR_ETC=\"\${DIR_INST}/etc\"" >>config
@@ -1258,7 +1297,9 @@ elif [ "$UNINSTALL" ]; then
 	exit 0
 
 
+# UPDATED 2026/03/17
 #elif [ "$BUILD" ] || [ "$COMPILE" ]; then
+#elif [ "$BUILD" ]; then
 #	if we're building or compiling, then all the below code needs to run
 fi
 
@@ -1537,18 +1578,18 @@ if [ "$PATCH" ]; then
 
 	if [ ! "$PASS" ]; then					# if we are not doing multi-pass, or we are on the first pass of a multi-pass, then...
 		IFS=$'\n'
-		for PATCH in $(ls -1 "${DIR_PROF}/patches" 2>/dev/null); do
+		for PATCH in $(ls -1 "${DIR_PROF}/${NAME}/patches" 2>/dev/null); do
 			[ ! "$PATCH" ] && continue		# no clue why this is even having to be processed, but...
 
 			echo -n "   ${PATCH##*/}: " | tee -a "$LOG"
-			if [ -x "${DIR_PROF}/patches/${PATCH}" ]; then
-				"${DIR_PROF}/patches/${PATCH}" || {
+			if [ -x "${DIR_PROF}/${NAME}/patches/${PATCH}" ]; then
+				"${DIR_PROF}/${NAME}/patches/${PATCH}" || {
 					echo "[failure]"
 					echo "      [failure]" >>"$LOG"
 					stop failed
 				}
 			else
-				patch -p 0 < "${DIR_PROF}/patches/${PATCH}" >/dev/null 2>>"$LOG" || {
+				patch -p 0 < "${DIR_PROF}/${NAME}/patches/${PATCH}" >/dev/null 2>>"$LOG" || {
 					echo "[failure]"
 					echo "      [failure]" >>"$LOG"
 					stop failed
@@ -1558,18 +1599,18 @@ if [ "$PATCH" ]; then
 		done 2>/dev/null
 	else
 		IFS=$'\n'
-		for PATCH in $(ls -1 "${DIR_PROF}/patches.${PASS}" 2>/dev/null); do
+		for PATCH in $(ls -1 "${DIR_PROF}/${NAME}/patches.${PASS}" 2>/dev/null); do
 			[ ! "$PATCH" ] && continue		# no clue why this is even having to be processed, but...
 
 			echo -n "   ${PATCH##*/}: " | tee -a "$LOG"
-			if [ -x "${DIR_PROF}/patches.${PASS}/${PATCH}" ]; then
-				"${DIR_PROF}/patches.${PASS}/${PATCH}" || {
+			if [ -x "${DIR_PROF}/${NAME}/patches.${PASS}/${PATCH}" ]; then
+				"${DIR_PROF}/${NAME}/patches.${PASS}/${PATCH}" || {
 					echo "[failure]"
 					echo "      [failure]" >>"$LOG"
 					stop failed
 				}
 			else
-				patch -p 0 < "${DIR_PROF}/patches.${PASS}/${PATCH}" >/dev/null 2>>"$LOG" || {
+				patch -p 0 < "${DIR_PROF}/${NAME}/patches.${PASS}/${PATCH}" >/dev/null 2>>"$LOG" || {
 					echo "[failure]"
 					echo "      [failure]" >>"$LOG"
 					stop failed
@@ -1585,16 +1626,16 @@ fi
 
 # PERFORM THE ACTUAL COMPILE
 
-[ ! "$PASS" ] && [ -x "${DIR_PROF}/pre.compile" ] && {		# execute any existing pre-compile script (for single-pass; multi-pass is next block)
+[ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/pre.compile" ] && {					# execute any existing pre-compile script (for single-pass; multi-pass is next block)
 	echo -e "\nExecuting the 'pre.compile' script..." | tee -a "$LOG"
-	"${DIR_PROF}/pre.compile" 2>>"$LOG" || stop failed
+	"${DIR_PROF}/${NAME}/pre.compile" 2>>"$LOG" || stop failed
 }
-[ "$PASS" ] && [ -x "${DIR_PROF}/pre.compile.${PASS}" ] && {
+[ "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/pre.compile.${PASS}" ] && {
 	echo -e "\nExecuting the 'pre.compile' script..." | tee -a "$LOG"
-	"${DIR_PROF}/pre.compile.${PASS}" 2>>"$LOG" || stop failed
+	"${DIR_PROF}/${NAME}/pre.compile.${PASS}" 2>>"$LOG" || stop failed
 }
 
-eval EXT_MAKE="\"$EXT_MAKE\""								# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
+eval EXT_MAKE="\"$EXT_MAKE\""									# NOTE: this has to be in this fashion so the dash in the name doesn't throw an error
 
 echo -e "\nGenerating the compile script..." | tee -a "$LOG"
 echo "#!/bin/sh" >"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
@@ -1664,14 +1705,14 @@ elif [ "$METHOD" = 'scons' ]; then
 	echo "scons $FLAG_CONF >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 fi
 
-[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.configure" ] && {											# execute any existing post-configure script (for single-pass; multi-pass is next block)
+[ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.configure" ] && {										# execute any existing post-configure script (for single-pass; multi-pass is next block)
 	echo "echo -e \"   Executing the 'post.configure' script...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
-	echo "${DIR_PROF}/post.configure >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
+	echo "${DIR_PROF}/${NAME}/post.configure >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	echo "echo -e \"   Proceeding with next steps of compile...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 }
-[ "$PASS" ] && [ -x "${DIR_PROF}/post.configure.${PASS}" ] && {
+[ "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.configure.${PASS}" ] && {
 	echo "echo -e \"   Executing the 'post.configure' script...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
-	echo "${DIR_PROF}/post.configure.${PASS} >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
+	echo "${DIR_PROF}/${NAME}/post.configure.${PASS} >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 	echo "echo -e \"   Proceeding with next steps of compile...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}.${EXT_MAKE}"
 }
 
@@ -1691,19 +1732,22 @@ echo -e "\nCompiling the software..." | tee -a "$LOG"
 echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
 TEMP=''
 for DIR in DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
-	( [ "$(eval echo \$$DIR)" = '' ] || [ "$DIR" = 'DIR_MISC' ] ) && [ ! -e "${DIR_PROF}/include/${DIR}" ] && [ ! -e "${DIR_PROF}/include.${PASS}/${DIR}" ] && continue
+	# skip the processing of the directory if either of these two conditions are met
+	( [ "$(eval echo \$$DIR)" = '' ] || [ "$DIR" = 'CFG_MISC' ] ) && continue
+	[ ! -e "${DIR_PROF}/${NAME}/include/${DIR}" ] && [ ! -e "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}" ] && continue
+
 	mkdir -p "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
-	[ "$PASS" ] && cp -dpR "${DIR_PROF}/include.${PASS}/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
-	[ ! "$PASS" ] && cp -dpR "${DIR_PROF}/include/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
+	[ "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
+	[ ! "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval echo \$$DIR)" 2>>"$LOG"
 done
 
-[ ! "$PASS" ] && [ -x "${DIR_PROF}/post.compile" ] && {												# execute any existing post-compile script (for single-pass; multi-pass is next line)
+[ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.compile" ] && {											# execute any existing post-compile script (for single-pass; multi-pass is next line)
 	echo -e "\nExecuting the 'post.compile' script..." | tee -a "$LOG"
-	"${DIR_PROF}/post.compile" 2>>"$LOG" || stop failed
+	"${DIR_PROF}/${NAME}/post.compile" 2>>"$LOG" || stop failed
 }
-[ "$PASS" ] && [ -x "${DIR_PROF}/post.compile.${PASS}" ] && {
+[ "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.compile.${PASS}" ] && {
 	echo -e "\nExecuting the 'post.compile' script..." | tee -a "$LOG"
-	"${DIR_PROF}/post.compile.${PASS}" 2>>"$LOG" || stop failed
+	"${DIR_PROF}/${NAME}/post.compile.${PASS}" 2>>"$LOG" || stop failed
 }
 
 
@@ -1717,18 +1761,24 @@ done
 
 # OPTIONALLY PACKAGE or INSTALL SOFTWARE
 
-if [ ! "$COMPILE" ]; then									# if we are packaging, then call those routines
+# UPDATED 2026/03/17
+#if [ ! "$COMPILE" ]; then									# if we are packaging, then call those routines
+if [ "$BUILD" = 'package' ]; then								# if we are packaging, then call those routines
 	package
 
-elif [ "$COMPILE" ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
+# UPDATED 2026/03/17
+#elif [ "$COMPILE" ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
+elif [ "$BUILD" = 'compile' ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then			# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
+	# NOTE: this is a separate step since builder ALWAYS installs to the
+	# staging directory so 'include' files can be added before installation
+
 	echo -e "\nInstalling the compiled software..." | tee -a "$LOG"
 
-	echo "Calling: cd \"$DIR_DUMP\"" >>"$LOG"
-	cd "${DIR_DUMP}" 2>>"$LOG" || {								# change into the temp packaging directory
+	echo "Calling: cd \"${DIR_DUMP}/${NAME}\"" >>"$LOG"
+	cd "${DIR_DUMP}/${NAME}" 2>>"$LOG" || {								# change into the temp packaging directory
 		echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
 		stop failed
 	}
-# LEFT OFF - do we need this step, or does this get installed during the 'make install' call?
 	echo "Calling: $SUDO cp -dpR ./* /" >>"$LOG"
 	eval $SUDO cp -dpR ./* / 2>>"$LOG" || {							# now copy the contents to the root of the file system
 		echo "ERROR: The compiled software could not be installed." >>"$LOG"
@@ -1741,7 +1791,7 @@ fi
 
 # COMPILATION CLEANUP
 
-if [ "$PASS" ] && [ -e "${DIR_PROF}/proper.${PASS}" ]; then					# if doing multi-pass -AND- automatic cleanup is requested on this pass...
+if [ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/proper.${PASS}" ]; then				# if doing multi-pass -AND- automatic cleanup is requested on this pass...
 	echo -e "\nCleaning the source code directory..." | tee -a "$LOG"
 
 	if [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then		# if we are on the last pass, then...
@@ -1750,12 +1800,12 @@ if [ "$PASS" ] && [ -e "${DIR_PROF}/proper.${PASS}" ]; then					# if doing multi
 	else											# otherwise we are on one of the passes, so...
 		stop clean 0									#   perform a partial cleanup
 	fi
-elif [ ! "$PASS" ] && [ -e "${DIR_PROF}/proper" ]; then						# if only doing a single pass -AND- automatic cleanup is requested...
+elif [ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/proper" ]; then					# if only doing a single pass -AND- automatic cleanup is requested...
 	echo -e "\nCleaning the source code directory..." | tee -a "$LOG"
 
 	stop proper 0
 elif [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then	# if only doing a single pass -OR- we are on the last pass, then...
-	echo -en "\nWould you like to cleanup now that the software has been packaged? [Y/N] (N): "
+	echo -en "\nWould you like to cleanup now that the software has been processed? [Y/N] (N): "
 	read
 	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0
 
@@ -1787,6 +1837,9 @@ fi
 	exit 0
 }
 
-[ "$COMPILE" ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
-[ ! "$COMPILE" ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
+# UPDATED 2026/03/17
+#[ "$COMPILE" ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
+#[ ! "$COMPILE" ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
+[ "$BUILD" = 'compile' ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
+[ "$BUILD" = 'package' ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
 

@@ -213,3 +213,16 @@
 - Updated the man page
 - Updated the --help output
 
+2026/03/17
+- Added DIR_INST to the builder profile template
+- Removed the copy code at the end in favor of proper 'make install' calls
+- Cleaned up commented out code
+- Updated the -i action to read in the profile files if -b or -c is passed
+- Updated "include file" processing to correct the logic into two statements
+- Updated DIR_MISC to CFG_MISC
+- Updated DIR_PROF references to include NAME
+- Updated -b to be '-b package'
+- Updated -c to be '-b compile'
+- Updated the man page
+- Updated the --help output
+
