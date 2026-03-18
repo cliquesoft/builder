@@ -226,3 +226,15 @@
 - Updated the man page
 - Updated the --help output
 
+2026/03/18
+- Added debug output to package()
+- Added code to restore the IFS after applying patches to prevent errors
+- Cleaned up commented out code
+- Updated PROFILE to CREATE
+- Updated WGET to SOURCE
+- Updated '-b compile' to '-b install'
+- Updated the 'find' calls in package() to use the CFG_ variables
+- Updated package() to include a missing dot separating the filename and ext
+- Updated the man page
+- Updated the --help output
+

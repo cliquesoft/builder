@@ -1,5 +1,5 @@
 .\"Man page for builder, by Dave Henderson.
-.TH builder 1 "2026 March 4"
+.TH builder 1 "2026 March 18"
 .SH NAME
 \fIbuilder\fR - package builder
 
@@ -568,10 +568,10 @@ to use the passed NAME parameter instead of the directory names, leaving
 this value blank. See the OPTIONS section below for more information.
 
 .B INFOFILE
-This variable can be used in conjunction with the WGET counterpart below,
-and would act like -I was passed. If WGET has a value, this one should be
-set to TRUE as well so that the source code can be obtained from the
-proper location (unless WGET='dir'). The default value is blank.
+This variable can be used in conjunction with the SOURCE counterpart below
+and would act like -I was passed. If SOURCE has a value, this one should
+be set to TRUE as well so that the source code can be obtained from the
+proper location (unless SOURCE='dir'). The default value is blank.
 
 .B PASS
 Indicating how many passes should be used with the profile, this is the
@@ -595,11 +595,11 @@ Relating to the compilation method (-M), this variable needs to be one of
 the valid word values instead of a simple binary. The default here is the
 standard 'configure, make, make install'.
 
-.B WGET
+.B SOURCE
 Finally, this variable corresponds to the '-C' option that specifies the
 location to download the source code from. There is no default value.
 
-You may have noticed that the -P and -U options do not have representation
+You may have noticed that the -{PSTU} options do not have representation
 in this file. Both of those switches should not affect the outcome of the
 software compilation, and should be left to the user to apply them if
 desired.
@@ -647,18 +647,21 @@ Shows helpful information about the program
 .B --version
 Displays the software version and exits.
 
-.B -b
-The action that will most likely be used, this one builds one or more
-distributable packages from source code. This action is aimed at the
-package maintainers for Linux distros. If DIRECTORY is passed, that will
-be the location used to process the source code.
+.B -b VALUE
+The most frequently used action. This builds software from source code
+and either installs it into your running system (via the 'install' value),
+or creates a distributable package for your Linux disto (using 'package').
+If DIRECTORY is passed, that will be the location used to process the
+source code.
 
 .B -c
-Like the prior action, this one also builds software from its source code.
-However, no packages are created. This action simply compiles and installs
-the project into the system, and is targeted towards anyone that wants to
-build a system from scratch using only source code. If DIRECTORY is used,
-that will be the location used to process the source code.
+After you have created a builder profile template and filled it out, you
+can use this action to create a single file for distribution. Ideally the
+software author would create a generic profile to make it easier for
+package maintainers for the various Linux distros to quickly modify to fit
+their own environment. An alternative location can be specified to package
+using the DIRECTORY parameter, otherwise a directory matching the NAME
+value in the current location will be used.
 
 .B -d
 Before builder can process a projects source code, it needs to acquire its
@@ -676,15 +679,6 @@ also be chained with the '-d' action in a single command to execute both
 tasks just one call. The DIRECTORY parameter will be used as the source
 location storing the builder profile.
 
-.B -p
-After you have created a builder profile template and filled it out, you
-can use this action to create a single file for distribution. Ideally the
-software author would create a generic profile to make it easier for
-package maintainers for the various Linux distros to quickly modify to fit
-their own environment. An alternative location can be specified to package
-using the DIRECTORY parameter, otherwise a directory matching the NAME
-value in the current location will be used.
-
 .B -r
 While not a routine task, there may be times when it is useful to update a
 package with alternative or additional files, without having to recompile
@@ -695,7 +689,6 @@ Use the DIRECTORY parameter to indicate the location to re-package,
 otherwise a directory matching the NAME value in the current location will
 be used.
 
-
 .B -t VALUE
 Use this action to create a builder profile template. This maintains a
 uniform layout, and makes it easier to know what to configure and include.
@@ -705,6 +698,13 @@ whereas 'profile' will create an example builder profile. To make both of
 these in a single call, pass the 'all' value. By default this places the
 files in a 'template' directory under DIR_TEMP, but can be changed using
 the DIRECTORY parameter.
+
+.B -u
+As time passes, builder profiles will need to be updated. This could be
+due to a different compilation method for the software, or by some other
+change that made the prior profile obsolete. By default, builder will not
+overwrite an installed profile. This action will uninstall an existing
+profile so that a new one can be added.
 
 
 

@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/17 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/18 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -117,7 +117,7 @@ THIS="$0"							# stores this script for multi-pass calls
 CPU='a32,a64,i32,i64,m32,m64,p32,p64,r32,r64,v32,v64'		# the CPU architectures that you wish to compile for (comma separated): ARM 32/64bit, Intel/AMD 32/64bit, RPi 32/64big
 CWDL="$(pwd)"							# stores the current working directory location
 EXPORTS=''							# the exported compile flags based on the desired CPU architecture
-export TYPE='bin'						# the type of package being made (e.g. bin, dev, doc, ...)	NOTE: the -p action uses this default value
+export TYPE='bin'						# the type of package being made (e.g. bin, dev, doc, ...)	NOTE: the -c action uses this default value
 TEMP=''								# stores a temporary value
 
 # [names]
@@ -128,7 +128,7 @@ DIRECTORY=''							# the location to process
 BUILD=''							# if we need to build a software package
 INSTALL=''							# indicates we need to install the builder profile
 COMPILE=''							# indicates that NO packaging should take place, only a software compile
-PROFILE=''							# create a builder profile
+CREATE=''							# create a builder profile
 REPACK=''							# indicates that we just need to repack the software since something in the 'include' directories changed
 TEMPLATE=''							# creates a blank builder profile template and exit
 UNINSTALL=''							# indicates we need to uninstall the builder profile
@@ -143,7 +143,7 @@ SKIP='TRUE'							# indicates we need to skip packaging until the final pass (bl
 SINGLE=''							# indicates all files need to be placed in a single package
 TRIM=''								# any part of the name to remove when building the package
 METHOD=''							# the method of compile being performed (e.g. autogen, bootstrap, ...)
-WGET=''								# indicates that we need to download the source code file; valid values: local, private, public
+SOURCE=''							# indicates the location to obtain the source code from
 UNLOAD=''							# indicates we need to unload the packages afterwards - regardless of success or failure
 
 # [config]
@@ -307,6 +307,8 @@ package() {
 
 		echo -e "\nSeparating into various packages..." | tee -a "$LOG"
 		for DIR in $NAMES; do
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$DIR\"" | tee -a "$LOG"
+
 			# strip the debug symbols from the just-compiled software		  https://superuser.com/questions/236601/how-do-i-execute-multiple-commands-when-using-find
 			find . -type f -executable \( -not -name \*.la -a -not -name \*.a \) -exec /bin/sh -c 'file -b --mime-type {} | grep -q application && strip --strip-unneeded {}' \;
 
@@ -317,24 +319,37 @@ package() {
 			[ ! -d "${DIR}.gir" ] && mkdir "${DIR}.gir" 2>>"$LOG"
 			[ ! -d "${DIR}.lib" ] && mkdir "${DIR}.lib" 2>>"$LOG"
 			[ ! -d "${DIR}.loc" ] && mkdir "${DIR}.loc" 2>>"$LOG"
+echo "DEBUG"
+ls -al
 
 			# split the package contents into bin, doc, dev, lib, ...
 			# https://unix.stackexchange.com/questions/154818/how-to-integrate-mv-command-after-find-command
 			# https://superuser.com/questions/596876/how-to-find-a-file-and-move-it-into-the-directory-it-was-found-in
 			# https://unix.stackexchange.com/questions/46322/how-can-i-recursively-delete-empty-directories-in-my-home-directory
 			# https://superuser.com/questions/236601/how-do-i-execute-multiple-commands-when-using-find
-			find "${DIR}${DIR_INST}/share/doc" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/share/html" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/share/info" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/share/man" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/share/gtk-doc" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+# UPDATED 2026/03/18
+#			find "${DIR}${DIR_INST}/share/doc" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+#			find "${DIR}${DIR_INST}/share/html" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+#			find "${DIR}${DIR_INST}/share/info" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+#			find "${DIR}${DIR_INST}/share/man" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+#			find "${DIR}${DIR_INST}/share/gtk-doc" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_DOC}" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_HTML}" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_INFO}" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_MAN}" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_DATA}/gtk-doc" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.doc\" '{}'" \; 2>/dev/null
 			find "$DIR" -not -type d \( -name \*.c -o -name \*.c++ -o -name \*.h -o -name \*.hh -o -name \*.hpp -o -name \*.hxx -o -name \*.h++ -o -name \*.pc -o -name \*.la -o -name \*.a -o -name \*.m4 -o -name \*.vapi \) -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.dev\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/lib/cmake" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.dev\" '{}'" \; 2>/dev/null		# NOTE: this was moved below the 'doc' since some packages (xslt) have html documentation ending in .c that doesn't need to go in the 'dev' package
+# UPDATED 2026/03/18
+#			find "${DIR}${DIR_INST}/lib/cmake" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.dev\" '{}'" \; 2>/dev/null		# NOTE: this was moved below the 'doc' since some packages (xslt) have html documentation ending in .c that doesn't need to go in the 'dev' package
+			find "${DIR}${CFG_LIB}/cmake" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.dev\" '{}'" \; 2>/dev/null		# NOTE: this was moved below the 'doc' since some packages (xslt) have html documentation ending in .c that doesn't need to go in the 'dev' package
 			find "$DIR" -not -type d -name Makefile.\* -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.dev\" '{}'" \; 2>/dev/null
 			find "$DIR" -type f -name \*.ko.gz -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.drv\" '{}'" \; 2>/dev/null
 			find "$DIR" -type f \( -name \*.typelib -o -name \*.gir \) -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.gir\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/lib/" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.lib\" '{}'" \; 2>/dev/null
-			find "${DIR}${DIR_INST}/lib64/" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.lib\" '{}'" \; 2>/dev/null
+# UPDATED 2026/03/18
+#			find "${DIR}${DIR_INST}/lib/" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.lib\" '{}'" \; 2>/dev/null
+#			find "${DIR}${DIR_INST}/lib64/" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.lib\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_LIB}/" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.lib\" '{}'" \; 2>/dev/null
+			find "${DIR}${CFG_LIB}64/" -not -type d -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.lib\" '{}'" \; 2>/dev/null
 			find "$DIR" -type f -name \*.mo -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.loc\" '{}'" \; 2>/dev/null
 
 			# get rid of all empty directories from the 'bin' package
@@ -351,20 +366,41 @@ package() {
 	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then						# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
 		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"		# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when METHOD=custom (e.g. FXwm)
 		for DIR in $NAMES; do
-			for PACK in $TEMP; do
-				[ ! -d "${DIR_DUMP}/${DIR}.${TYPE}" ] && continue		# if a directory is missing then there's no reason to process something that doesn't exist!
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$DIR\"" | tee -a "$LOG"
 
-				cd "${DIR_DUMP}/${DIR}.${TYPE}" 2>>"$LOG" || {			# change into the temp packaging directory
-					echo "Calling: cd \"${DIR_DUMP}/${DIR}.${TYPE}\"" >>"$LOG"
+			for PACK in $TEMP; do
+				[ $DEBUG -gt 0 ] && echo -n "      DEBUG (Iterating): \"$PACK\"" | tee -a "$LOG"
+# UPDATED 2026/03/18
+#				[ ! -d "${DIR_DUMP}/${DIR}.${TYPE}" ] && {			# if a directory is missing then there's no reason to process something that doesn't exist!
+				[ ! -d "${DIR_DUMP}/${DIR}.${PACK}" ] && {			# if a directory is missing then there's no reason to process something that doesn't exist!
+					[ $DEBUG -gt 0 ] && echo " [skipped]" | tee -a "$LOG"
+					continue
+				}
+				[ $DEBUG -gt 0 ] && echo " [processing]" | tee -a "$LOG"
+
+# UPDATED 2026/03/18
+#				cd "${DIR_DUMP}/${DIR}.${TYPE}" 2>>"$LOG" || {			# change into the temp packaging directory
+#					echo "Calling: cd \"${DIR_DUMP}/${DIR}.${TYPE}\"" >>"$LOG"
+				cd "${DIR_DUMP}/${DIR}.${PACK}" 2>>"$LOG" || {			# change into the temp packaging directory
+					echo "Calling: cd \"${DIR_DUMP}/${DIR}.${PACK}\"" >>"$LOG"
 					echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
 					stop failed
 				}
+echo -n "DEBUG: "
+pwd
+echo '-----'
+ls -R ./
+echo '-----'
 				find . \( -type f -exec chmod $PRM_FILES {} \; \) , \( -type d -exec chmod $PRM_DIRS {} \; \)			# update the permissions of all the package contents	https://stackoverflow.com/questions/3740152/how-do-i-set-chmod-for-a-folder-and-all-of-its-subfolders-and-files-in-linux-ubu
 				[ "$DIR_MARKERS" ] && find ".${DIR_MARKERS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
 				find ".${DIR_SCRIPTS}" -exec chmod $PRM_EXECS {} \; 2>/dev/null
-				find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null		# update the permissions of all the libraries
-				find ".${DIR_INST}/lib64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
-				find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null				# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
+# UPDATED 2026/03/18
+#				find ".${DIR_INST}/lib/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null		# update the permissions of all the libraries
+#				find ".${DIR_INST}/lib64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
+#				find ".${DIR_INST}/libexec/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null				# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
+				find ".${CFG_LIB}/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null		# update the permissions of all the libraries
+				find ".${CFG_LIB}64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
+				find ".${CFG_LIBEXEC}/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null					# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
 				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null			# update these directory contents to be executable
 				eval $SUDO chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>"$LOG" 2>&1							# update the ownership of all the package contents
 			done
@@ -381,7 +417,10 @@ package() {
 
 	# CREATE EACH PACKAGE
 
-	[ ! "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && return 0				# if '-F' was passed -AND- '-N' was passed -AND- we are on the last pass, then exit this function
+	[ ! "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && {
+		[ $DEBUG -gt 0 ] && echo "   DEBUG: The -F and -N was passed, but we're not on the last pass."
+		return 0									# if '-F' was passed -AND- '-N' was passed -AND- we are on the last pass, then exit this function
+	}
 
 	cd "${DIR_DUMP}" 2>>"$LOG" || {								# change into the temp packaging directory
 		echo "Calling: cd \"$DIR_DUMP\"" >>"$LOG"
@@ -405,27 +444,41 @@ package() {
 		eval $SUDO mv "$NAME" "$NAMES" 2>>"$LOG"
 	}
 	[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' | sort -u)"		# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+	[ $DEBUG -gt 0 ] && echo "DEBUG (NAMES): \"$NAMES\""
 												# NOTE: list all contents | non-greedy sed to remove extension (e.g. .bin) | sort to remove duplicates
 	echo -e "\nCreating the various packages..." | tee -a "$LOG"
 	for ID in $NAMES; do									# NOTE: the ID variable will contain directory names, or the actual names of the packages - depending on configuration
+		[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$ID\"" | tee -a "$LOG"
+
 		for PACK in $TEMP; do
-			[ ! -d "${ID}.${PACK}" ] && continue					# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
+			[ $DEBUG -gt 0 ] && echo -n "      DEBUG (Iterating): \"$PACK\"" | tee -a "$LOG"
+			[ ! -d "${ID}.${PACK}" ] && {						# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
+				[ $DEBUG -gt 0 ] && echo " [skipped]" | tee -a "$LOG"
+				continue
+			}
+			[ $DEBUG -gt 0 ] && echo " [processing]" | tee -a "$LOG"
 
 			eval PAK_DEPS="$EXT_DEPS"						# update these values if variables were included in their name
 			eval PAK_HASH="$EXT_HASH"
 			eval PAK_INFO="$EXT_INFO"
 			eval PAK_LIST="$EXT_LIST"
-			eval PAK_SOFT="$(echo "$EXT_SOFT" | sed "s/${EXT_BIND}//")"		# remove any applicable naming convention from the software package name (e.g. -bin)
+			[ ! "$EXT_BIND" ] && eval PAK_SOFT="$EXT_SOFT"
+			[ "$EXT_BIND" ] && eval PAK_SOFT="$(echo "$EXT_SOFT" | sed "s/${EXT_BIND}//")"						# remove any applicable naming convention from the software package name (e.g. -bin)
 
 			eval URL_TEMP="${URL_INFO//NAME/ID}"
 
-			[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $ID $PACK, ${ID}${PAK_SOFT}"
-			[ $DEBUG -gt 0 ] && echo "   DEBUG (URL Info): $URL_TEMP"
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $ID [${PACK}], ${ID}.${PAK_SOFT}" | tee -a "$LOG"
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (URL Info): $URL_TEMP" | tee -a "$LOG"
 
-			[ "$(ls -1 "${ID}.${PACK}" | head -1)" = '' ] && continue		# if there are no contents for the iterated package, then no reason to execute the below segment
+			[ "$(ls -1 "${ID}.${PACK}" | head -1)" = '' ] && {			# if there are no contents for the iterated package, then no reason to execute the below segment
+				[ $DEBUG -gt 0 ] && echo "   DEBUG (skipped)" | tee -a "$LOG"
+				continue
+			}
 			echo "   ${ID} [${PACK}]"
 			echo -e "\n\n   ----- ${ID} ${PACK} -----\n\n" >>"$LOG"
-			eval $SPM_MAKE								# NOTE: we use a variable so any package manager can create a native package for their distro
+# LEFT OFF - we may need to quote other 'eval' statements
+eval echo "DEBUG: $SPM_MAKE"
+			[ "$SPM_MAKE" ] && eval "$SPM_MAKE"					# NOTE: we use a variable so any package manager can create a native package for their distro
 
 			( [ "$PACK" = 'all' ] || [ "$PACK" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
 			( [ "$PACK" = 'all' ] || [ "$PACK" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && echo -e "${DEP_EXEC_DEV}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
@@ -438,7 +491,7 @@ package() {
 				eval wget -cq "$URL_TEMP" -O "${DIR_REPO}/${ID}${PAK_INFO}" 2>/dev/null
 			}
 
-			mv "${ID}${PAK_SOFT}" "${ID}${PAK_LIST}" "${ID}${PAK_HASH}" "$DIR_REPO"
+			mv "${ID}.${PAK_SOFT}" "${ID}.${PAK_LIST}" "${ID}.${PAK_HASH}" "$DIR_REPO"
 			echo "   Your package is now available in: ${DIR_REPO}"			# copy the files into the repo
 		done
 	done
@@ -495,20 +548,14 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	${THIS##*/} [OPTIONS] ACTION NAME [DIRECTORY]"
 	echo
 	echo "  Actions:"
-# left off - update the man page to reflect that -b is now -b and -c
-	echo "	-b   build software: compile, package"
-# UPDATED 2026/03/17
-#	echo "	-c   compile and install the software without packaging"
-# left off - update the man page
+	echo "	-b   build software from source code: install, package"
 	echo "	-c   create a builder profile"
 	echo "	-d   download the builder profile (uses URL_REPO)"
 	echo "	-i   install the builder profile"
-# UPDATED 2026/03/17
-#	echo "	-p   create a builder profile"
 	echo "	-r   only re-package software instead of building"
 # VER2 - for every -C value that's filled out, this can sync the software with each of those sources with a single command
 #	echo "	-s   sync source code to all configured locations"
-	echo "	-t   create a package template: all, info, profile"
+	echo "	-t   create a profile template: all, info, profile"
 	echo "	-u   uninstall the builder profile"
 # VER2 - check for updates to software via git or website; also allow this to be setup via cron to automatically check
 #	if the (homepage) link is not present (since it would change to a different filename), there's an update
@@ -546,11 +593,11 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "  Build Software Steps:                             [end user/package creator]"
 	echo "	1. builder -d NAME [DIRECTORY] (or download the profile manually)"
 	echo "	2. builder -i NAME /location/of/builder/profile"
-	echo "	3. builder -b {compile|package} NAME /package/source/code/directory"
+	echo "	3. builder -b {install|package} NAME /package/source/code/directory"
 	echo "	   NOTES:"
 	echo "	   - each step can be combined into one call 'builder -b ... -d -i ...'"
 	echo "	   - if no profile 'params' file exists, add any desired switches"
-	echo "	   - use '-b compile' to compile and install the software (end user)"
+	echo "	   - use '-b install' to compile and install the software (end user)"
 	echo "	   - use '-b package' to create a distributable software package"
 	echo
 	echo "  Profile Creation Steps:                          [developer/package creator]"
@@ -567,7 +614,7 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	10. Add any desired extra files under the 'extras' directory"
 	echo "	11. Add any desired patches under the 'patches' directory"
 	echo "	12. cd ${DIR_TEMP}"
-	echo "	13. Run: builder -p NAME"
+	echo "	13. Run: builder -c NAME"
 	echo
 	echo "  Profile Contents Key:"
 	echo "	extras [directory]"
@@ -628,7 +675,7 @@ elif [ "$1" = '--version' ]; then
 	exit 0
 else
 	TEMP=0
-	while getopts A:b:cC:dDeFiIM:N:PrR:St:T:uU OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
+	while getopts A:b:cC:dDFiIM:N:PrR:St:T:uU OPTION; do					# NOTE: the 'A:' indicates that the '-A' switch requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -641,21 +688,17 @@ else
 				exit 1
 			   }
 			   ARCH="$OPTARG" ;;
-# UPDATED 2026/03/17
-#			b) BUILD='TRUE' ;;
-			b) ( echo "${OPTARG}" | grep -qE ^'(compile|package)'$ ) || {
+			b) ( echo "${OPTARG}" | grep -qE ^'(install|package)'$ ) || {
 				echo "ERROR: An invalid value for '-b' was passed."
 				exit 1
 			   }
 			   BUILD="$OPTARG" ;;
-# UPDATED 2026/03/17
-#			c) COMPILE='TRUE' ;;
-			c) PROFILE='TRUE' ;;
+			c) CREATE='TRUE' ;;
 			C) ( echo "${OPTARG}" | grep -qE ^'(dev|dir|git|repo)'$ ) || {
 				echo "ERROR: An invalid value for '-C' was passed."
 				exit 1
 			   }
-			   WGET="$OPTARG" ;;
+			   SOURCE="$OPTARG" ;;
 			d) DOWNLOAD='TRUE' ;;
 			D) DIRS='TRUE' ;;
 			F) SKIP='' ;;
@@ -663,8 +706,6 @@ else
 			I) INFOFILE='TRUE' ;;
 			M) METHOD="$OPTARG" ;;
 			N) PASS="$OPTARG" ;;
-# UPDATED 2026/03/17
-#			p) PROFILE='TRUE' ;;
 			P) PATCH='' ;;
 			r) REPACK='TRUE' ;;
 			R) TRIM="$OPTARG" ;;
@@ -694,7 +735,7 @@ else
 	shift $(expr $OPTIND - 1)								# now that the ACTIONS and OPTIONS have been processed, lets process the package name(s)
 	eval TEMP=\${$#}									# store the current last passed value to later check if a directory was passed as the last value	http://stackoverflow.com/questions/1853946/getting-the-last-argument-passed-to-a-shell-script
 	if [ "$TEMP" != "$0" ] && ( echo "$TEMP" | grep -q '/' ); then				# if a DIRECTORY was passed, then...
-		[ "$WGET" != 'dir' ] && [ ! -d "$TEMP" ] && { echo "ERROR: The passed directory does not exist (${TEMP})."; exit 1; }		#  if '-C dir' was NOT passed -AND- if it does NOT exist, then...
+		[ "$SOURCE" != 'dir' ] && [ ! -d "$TEMP" ] && { echo "ERROR: The passed directory does not exist (${TEMP})."; exit 1; }		#  if '-C dir' was NOT passed -AND- if it does NOT exist, then...
 
 		DIRECTORY="$TEMP"								#   store the DIRECTORY value
 
@@ -725,40 +766,23 @@ fi
 # action checking						  NOTE: we can't write to a log yet since those checks haven't occurred
 TEMP=0
 [ "$BUILD" ] && TEMP=$(( TEMP + 1 ))
-# REMOVED 2026/03/17
-#[ "$COMPILE" ] && TEMP=$(( TEMP + 1 ))
+[ "$CREATE" ] && TEMP=$(( TEMP + 1 ))
 [ "$DOWNLOAD" ] && TEMP=$(( TEMP + 1 ))
 [ "$INSTALL" ] && TEMP=$(( TEMP + 1 ))
-[ "$PROFILE" ] && TEMP=$(( TEMP + 1 ))
 [ "$REPACK" ] && TEMP=$(( TEMP + 1 ))
 [ "$TEMPLATE" ] && TEMP=$(( TEMP + 1 ))
 [ "$UNINSTALL" ] && TEMP=$(( TEMP + 1 ))
-[ $TEMP -gt 1 ] && [ ! "$PROFILE" ] && [ ! "$REPACK" ] && [ ! "$TEMPLATE" ] && [ ! "$UNINSTALL" ] && TEMP=1					# if the -d, -i, and -{b|c} were chained, that is permissible, any other chained actions are not!
+[ $TEMP -gt 1 ] && [ ! "$CREATE" ] && [ ! "$REPACK" ] && [ ! "$TEMPLATE" ] && [ ! "$UNINSTALL" ] && TEMP=1					# if the -d, -i, and -{b|c} were chained, that is permissible, any other chained actions are not!
 [ $TEMP -gt 1 ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
-# REMOVED 2026/03/17
-#[ "$BUILD" ] && [ "$COMPILE" ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }				# just in case '-b -c ...' was passed (which will pass the first test above)
 
 # option checking
-# UPDATED 2026/03/17
-#[ "$ARCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -A option can't be used with this action."; exit 1; }
-#[ "$WGET" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -C option can't be used with this action."; exit 1; }
-#[ "$DIRS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -D option can't be used with this action."; exit 1; }
-#[ ! "$SKIP" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -F option can't be used with this action."; exit 1; }
-#[ "$INFOFILE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -I option can't be used with this action."; exit 1; }
 [ "$ARCH" ] && [ ! "$BUILD" ] && { echo "The -A option can't be used with this action."; exit 1; }
-[ "$WGET" ] && [ ! "$BUILD" ] && { echo "The -C option can't be used with this action."; exit 1; }
+[ "$SOURCE" ] && [ ! "$BUILD" ] && { echo "The -C option can't be used with this action."; exit 1; }
 [ "$DIRS" ] && [ ! "$BUILD" ] && { echo "The -D option can't be used with this action."; exit 1; }
 [ ! "$SKIP" ] && [ ! "$BUILD" ] && { echo "The -F option can't be used with this action."; exit 1; }
 [ "$INFOFILE" ] && [ ! "$BUILD" ] && { echo "The -I option can't be used with this action."; exit 1; }
-[ "$INFOFILE" ] && [ ! "$WGET" ] && { echo "The -I option must be used with the -C option."; exit 1; }
-# UPDATED 2026/03/17
-#[ "$METHOD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -M option can't be used with this action."; exit 1; }
-#[ "$PASS" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -N option can't be used with this action."; exit 1; }
-#[ ! "$PATCH" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -P option can't be used with this action."; exit 1; }
-#[ "$TRIM" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -R option can't be used with this action."; exit 1; }
-#[ "$SINGLE" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -S option can't be used with this action."; exit 1; }
-#[ "$UNLOAD" ] && [ ! "$BUILD" ] && [ ! "$COMPILE" ] && { echo "The -U option can't be used with this action."; exit 1; }
+[ "$INFOFILE" ] && [ ! "$SOURCE" ] && { echo "The -I option must be used with the -C option."; exit 1; }
 [ "$METHOD" ] && [ ! "$BUILD" ] && { echo "The -M option can't be used with this action."; exit 1; }
 [ "$PASS" ] && [ ! "$BUILD" ] && { echo "The -N option can't be used with this action."; exit 1; }
 [ ! "$PATCH" ] && [ ! "$BUILD" ] && { echo "The -P option can't be used with this action."; exit 1; }
@@ -766,19 +790,19 @@ TEMP=0
 [ "$SINGLE" ] && [ ! "$BUILD" ] && { echo "The -S option can't be used with this action."; exit 1; }
 [ "$UNLOAD" ] && [ ! "$BUILD" ] && { echo "The -U option can't be used with this action."; exit 1; }
 [ ! "$SKIP" ] && [ ! "$PASS" ] && { echo "ERROR: The '-F' option requires a valid '-N' value."; exit 1; }
-if [ "$WGET" != '' ]; then
+if [ "$SOURCE" != '' ]; then
 	TEMP=''
-	[ ! "$INFOFILE" ] && ( ( [ "$WGET" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$WGET" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$WGET" = 'git' ] && [ ! "$GIT_REPO" ] ) || ( [ "$WGET" = 'repo' ] && [ ! "$URL_REPO" ] ) ) && {
-		[ "$WGET" = 'dev' ] && TEMP='URL_CODE'
-		[ "$WGET" = 'dir' ] && TEMP='DIR_REPO'
-		[ "$WGET" = 'git' ] && TEMP='GIT_REPO'
-		[ "$WGET" = 'repo' ] && TEMP='URL_REPO'
+	[ ! "$INFOFILE" ] && ( ( [ "$SOURCE" = 'dev' ] && [ ! "$URL_CODE" ] ) || ( [ "$SOURCE" = 'dir' ] && [ ! "$DIR_REPO" ] ) || ( [ "$SOURCE" = 'git' ] && [ ! "$GIT_REPO" ] ) || ( [ "$SOURCE" = 'repo' ] && [ ! "$URL_REPO" ] ) ) && {
+		[ "$SOURCE" = 'dev' ] && TEMP='URL_CODE'
+		[ "$SOURCE" = 'dir' ] && TEMP='DIR_REPO'
+		[ "$SOURCE" = 'git' ] && TEMP='GIT_REPO'
+		[ "$SOURCE" = 'repo' ] && TEMP='URL_REPO'
 
-		echo "ERROR: The '-C $WGET' option requires a $TEMP value."
+		echo "ERROR: The '-C $SOURCE' option requires a $TEMP value."
 		exit
 	}
 
-	if [ "$WGET" = 'dir' ]; then
+	if [ "$SOURCE" = 'dir' ]; then
 		[ ! "$DIRECTORY" ] && {
 			echo "ERROR: The '-C dir' option requires a DIRECTORY value including the filename."
 			exit
@@ -792,7 +816,7 @@ if [ "$WGET" != '' ]; then
 			exit
 		}
 	fi
-	[ "$WGET" = 'git' ] && [ ! "$(which git)" ] && {
+	[ "$SOURCE" = 'git' ] && [ ! "$(which git)" ] && {
 		echo "ERROR: The git binary is missing and is necessary when using '-C git'."
 		exit
 	}
@@ -890,8 +914,8 @@ if [ "$DIRECTORY" ]; then									# if DIRECTORY was passed, then...
 	[ "$TEMPLATE" ] && DIR_TEMP="$DIRECTORY"						#   if we're creating a template, then we need to change this variable value so the below code works correctly
 	[ "$UNINSTALL" ] && DIR_PROF="$DIRECTORY"						#   if we're uninstalling a profile, then we need to change this variable value so the below code works correctly
 
-	[ "$PROFILE" ] && { cd "${DIRECTORY}/.." >/dev/null || exit 1; }			#   if we're creating a builder profile...		NOTE: this goes one level up from the passed DIRECTORY value
-	[ ! "$PROFILE" ] && [ "$WGET" != 'dir' ] && { cd "$DIRECTORY" >/dev/null || exit 1; }	#   for any other action (that doesn't involve '-C dir'), change into the DIRECTORY
+	[ "$CREATE" ] && { cd "${DIRECTORY}/.." >/dev/null || exit 1; }				#   if we're creating a builder profile...		NOTE: this goes one level up from the passed DIRECTORY value
+	[ ! "$CREATE" ] && [ "$SOURCE" != 'dir' ] && { cd "$DIRECTORY" >/dev/null || exit 1; }	#   for any other action (that doesn't involve '-C dir'), change into the DIRECTORY
 else												# otherwise it was NOT passed, so...
 	[ "$DOWNLOAD" ] && cd "$DIR_PROF"							#   change into the default download location
 	[ "$INSTALL" ] && cd "$DIR_PROF"							#   ditto
@@ -956,8 +980,6 @@ if [ "$INSTALL" ]; then
 	echo " [done]" | tee -a "$LOG"
 
 	# if we're not also building or compiling, then we need to exit
-# UPDATED 2026/03/17
-#	[ ! "$BUILD" ] && [ ! "$COMPILE" ] && exit 0
 	[ ! "$BUILD" ] && exit 0
 
 	# otherwise, load the profile configuraiton
@@ -971,7 +993,7 @@ fi
 
 # NOTE: these have to be separate 'if' statements so ONLY these two can be chained with others!
 
-if [ "$PROFILE" ]; then
+if [ "$CREATE" ]; then
 	[ ! -d "$NAME" ] && {
 		echo "ERROR: No directory exists with that name."
 		exit 1
@@ -1118,7 +1140,7 @@ elif [ "$TEMPLATE" ]; then
 		echo "#SKIP='TRUE'" >>params
 		echo "#TRIM=''" >>params
 		echo "#METHOD='default'" >>params
-		echo "#WGET=''" >>params
+		echo "#SOURCE=''" >>params
 
 		echo "#!/bin/sh" >pre.compile
 		echo "# Specify any pre-compile actions in this script. If there" >>pre.compile
@@ -1297,10 +1319,8 @@ elif [ "$UNINSTALL" ]; then
 	exit 0
 
 
-# UPDATED 2026/03/17
-#elif [ "$BUILD" ] || [ "$COMPILE" ]; then
 #elif [ "$BUILD" ]; then
-#	if we're building or compiling, then all the below code needs to run
+#	if we're building, then all the below code needs to run
 fi
 
 
@@ -1312,7 +1332,7 @@ fi
 if [ "$ARCH" = 'all' ]; then					# if we need to compile all architectures, then...
 	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do		# call this script for all supported CPU architectures and exit
 		TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
-		[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
+		[ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"
 		[ "$DIRS" ] && TEMP="$TEMP -D"
 		[ "$PASS" ] && TEMP="$TEMP -N $PASS"
 		[ "$PATCH" ] && TEMP="$TEMP -P"
@@ -1375,7 +1395,7 @@ fi
 	echo "   SKIP: $SKIP" | tee -a "$LOG"
 	echo "   TRIM: $TRIM" | tee -a "$LOG"
 	echo "   METH: $METHOD" | tee -a "$LOG"
-	echo "   WGET: $WGET" | tee -a "$LOG"
+	echo "   SRCE: $SOURCE" | tee -a "$LOG"
 	echo | tee -a "$LOG"
 	echo "   CHECK: $CHECK" | tee -a "$LOG"
 	echo "   CLEAN: $CLEAN" | tee -a "$LOG"
@@ -1424,7 +1444,7 @@ echo -e "\nInstalling compile-time dependencies..." | tee -a "$LOG"
 
 # FETCH SOURCE CODE
 
-if [ "$WGET" ]; then										# if we need to obtain the source code before we start, then...
+if [ "$SOURCE" ]; then										# if we need to obtain the source code before we start, then...
 	echo "Calling: cd \"${DIR_TEMP}/${NAME}\"" >>"$LOG"
 	cd "${DIR_TEMP}/${NAME}" || {
 		echo "ERROR: The temp directory could not be entered." >>"$LOG"
@@ -1451,20 +1471,20 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 		unset $OARCH									# get rid of that variable
 
 		# now set the variable values for the below code blocks
-		if [ "$WGET" = 'dev' ]; then
+		if [ "$SOURCE" = 'dev' ]; then
 			if ( grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | grep -qE ^'(ht|f)tp' ); then				# if the 'download' value is not a continuation of the 'homepage', then it's the entire URL so...
 				URL_CODE="$(grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//')"
 			elif [ "$(grep -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]*//')" ]; then						# otherwise it is has a value and is a continuation, then append it to 'homepage'...
 				URL_CODE="$(grep -i -e ^'homepage:' -e ^'download:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			fi
 			[ ! "$URL_CODE" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
-		elif [ "$WGET" = 'git' ]; then
+		elif [ "$SOURCE" = 'git' ]; then
 			# if there's a 'file' value, then...
 			[ "$(grep -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]*//')" ] && GIT_REPO="$(grep -i -e ^'git:' -e ^'file:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			# NOTE: we do NOT check if 'clone:' has a value since it may not
 			[ ! "$GIT_REPO" ] && GIT_REPO="$(grep -i -e ^'git:' -e ^'clone:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$GIT_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
-		elif [ "$WGET" = 'repo' ]; then
+		elif [ "$SOURCE" = 'repo' ]; then
 			# if there's a 'source' value, then...
 			[ "$(grep -e ^'source:' "${TEMP}" | sed -r 's/^.*:[\t]*//')" ] && URL_REPO="$(grep -i -e ^'repo:' -e ^'source:' "${TEMP}" | sed -r 's/^.*:[\t]+//' | tr '\n' '/' | sed 's:/$::')"
 			[ ! "$URL_REPO" ] && { echo -e "ERROR: The info file does not contain a valid source code download value\n       for this location." && stop failed; }
@@ -1477,39 +1497,39 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 
 	[ "$TRIM" ] && TEMP="$(echo "$NAME" | sed "s/${TRIM}//")"				# apply the trim beforehand
 	[ ! "$TRIM" ] && TEMP="$NAME"
-	if ( [ "$WGET" != 'git' ] && [ -e "$(eval echo ${TEMP}${EXT_CODE})" ] ) || ( [ "$WGET" = 'git' ] && [ -e ".git" ] ); then		# if the source code is already present, then...
+	if ( [ "$SOURCE" != 'git' ] && [ -e "$(eval echo ${TEMP}${EXT_CODE})" ] ) || ( [ "$SOURCE" = 'git' ] && [ -e ".git" ] ); then		# if the source code is already present, then...
 		echo "ERROR: The source code is already present and needs to be moved or deleted."
 		stop failed
 	fi											# otherwise lets get it!
 
-	[ "$WGET" = 'dir' ] && {
+	[ "$SOURCE" = 'dir' ] && {
 		echo "Calling: cp \"${DIRECTORY}\" ./" >>"$LOG"
 		cp "${DIRECTORY}" ./ 2>>"$LOG" || stop failed
 	}
-	[ "$WGET" = 'dev' ] && {
+	[ "$SOURCE" = 'dev' ] && {
 		TEMP="$(echo "$URL_CODE" | sed "s/\${NAME}/${TEMP}/g")"
 		eval echo "Calling: wget -cq \"$TEMP\"" >>"$LOG"
 		eval wget -cq "$TEMP" 2>>"$LOG" || stop failed
 	}
-	[ "$WGET" = 'git' ] && {
+	[ "$SOURCE" = 'git' ] && {
 		if ( echo "$GIT_REPO" | grep -qE '(tgz|zip)'$ ); then				# if the git link is a distributable file, then...
 			eval echo "Calling: wget -cq \"$GIT_REPO\"" >>"$LOG"
 			eval wget -cq "$GIT_REPO" 2>>"$LOG" || stop failed			#   download it
-			WGET='git2'								#   temporarily change the value so the below uncompression code can run
+			SOURCE='git2'								#   temporarily change the value so the below uncompression code can run
 		else										# otherwise, we have a git repo to clone, so...
 			TEMP="$(echo "$GIT_REPO" | sed "s/\${NAME}/$TEMP/g")"
 			eval echo "Calling: git clone \"$TEMP\"" >>"$LOG"
 			eval git clone "$TEMP" 2>>"$LOG" || stop failed				#   clone it!
 		fi
 	}
-	[ "$WGET" = 'repo' ] && {
+	[ "$SOURCE" = 'repo' ] && {
 		TEMP="$(echo "${URL_REPO}" | sed "s/\${NAME}/$TEMP/g")"
 		( echo "$TEMP" | grep -q "${NAME}.${EXT_CODE}"$ ) || TEMP="${TEMP}/${NAME}.${EXT_CODE}"						# if the URL_REPO was not assigned via -I above, then we need to append the filename to the URL
 		eval echo "Calling: wget -cq \"${TEMP}\"" >>"$LOG"
 		eval wget -cq "${TEMP}" 2>>"$LOG" || stop failed
 	}
 
-	if [ "$WGET" != 'git' ]; then								# if we're not cloing a git repo (since it would already be uncompressed files), then...
+	if [ "$SOURCE" != 'git' ]; then								# if we're not cloing a git repo (since it would already be uncompressed files), then...
 		TEMP="$(ls -1t | head -1)"							#    store the filename that was just downloaded
 		echo "Source Code File: $TEMP" >>"$LOG"
 		case $(file -b --mime-type "$TEMP") in
@@ -1520,7 +1540,7 @@ if [ "$WGET" ]; then										# if we need to obtain the source code before we s
 				tar -xf "${TEMP%.*}" 2>>"$LOG"
 				;;
 		esac
-		[ "$WGET" = 'git2' ] && WGET='git'						#    if the value had been temporarily changed above, we now need to change it back
+		[ "$SOURCE" = 'git2' ] && SOURCE='git'						#    if the value had been temporarily changed above, we now need to change it back
 	fi
 
 	echo -e "Detected:\n$(ls -tdpr -- * | grep '/'$)" >>"$LOG"
@@ -1576,6 +1596,7 @@ fi
 if [ "$PATCH" ]; then
 	echo -e "\nApplying software patches..." | tee -a "$LOG"
 
+	OLDIFS="$IFS"
 	if [ ! "$PASS" ]; then					# if we are not doing multi-pass, or we are on the first pass of a multi-pass, then...
 		IFS=$'\n'
 		for PATCH in $(ls -1 "${DIR_PROF}/${NAME}/patches" 2>/dev/null); do
@@ -1619,6 +1640,7 @@ if [ "$PATCH" ]; then
 			echo "[success]" | tee -a "$LOG"
 		done 2>/dev/null
 	fi
+	IFS="$OLDIFS"
 fi
 
 
@@ -1761,14 +1783,10 @@ done
 
 # OPTIONALLY PACKAGE or INSTALL SOFTWARE
 
-# UPDATED 2026/03/17
-#if [ ! "$COMPILE" ]; then									# if we are packaging, then call those routines
 if [ "$BUILD" = 'package' ]; then								# if we are packaging, then call those routines
 	package
 
-# UPDATED 2026/03/17
-#elif [ "$COMPILE" ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then				# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
-elif [ "$BUILD" = 'compile' ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then			# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
+elif [ "$BUILD" = 'install' ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then			# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
 	# NOTE: this is a separate step since builder ALWAYS installs to the
 	# staging directory so 'include' files can be added before installation
 
@@ -1821,7 +1839,7 @@ fi
 	echo -e "\nStarting the next pass..." | tee -a "$LOG"
 
 	TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
-	[ "$WGET" != '' ] && TEMP="$TEMP -C $WGET"
+	[ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"
 	[ "$DIRS" ] && TEMP="$TEMP -D"
 	#[ "$PASS" ] && TEMP="$TEMP -N $PASS"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
 	[ "$PATCH" ] && TEMP="$TEMP -P"
@@ -1837,9 +1855,6 @@ fi
 	exit 0
 }
 
-# UPDATED 2026/03/17
-#[ "$COMPILE" ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
-#[ ! "$COMPILE" ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
-[ "$BUILD" = 'compile' ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
+[ "$BUILD" = 'install' ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
 [ "$BUILD" = 'package' ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
 
