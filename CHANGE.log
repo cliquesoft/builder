@@ -238,3 +238,11 @@
 - Updated the man page
 - Updated the --help output
 
+2026/03/19
+- Updated each eval statement to surround it with quotes
+- Updated several statements to have proper syntax after eval update
+- Updated the '-t info' filename from NAME.info to NAME.EXT_INFO
+- Deleted the dot separation in filenames throughout (for naming flexibility)
+- Added the preceeding dot to the EXT_ variables
+- Updated config file values
+
