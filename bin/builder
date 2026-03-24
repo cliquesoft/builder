@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/19 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/24 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -63,7 +63,8 @@ export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}'				# the distro
 
 export SPM_ALL='$SUDO pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
 export SPM_PACK='$SUDO pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
-export SPM_MAKE='$SUDO pax -m $NAME ./'				# the software package manager command to make a package from the compiled software by this script
+#export SPM_MAKE='$SUDO pax -S ./ -m ${ID} ${DIR_DUMP}/${ID}.${PACK}'		# the software package manager command to make a package from the compiled software by this script
+export SPM_MAKE='$SUDO pax -S ${DIR_DUMP}/${ID}.${PACK} -m ${PACKAGE} ${DIR_DUMP}'		# the software package manager command to make a package from the compiled software by this script
 export SPM_UNLD='$SUDO pax -u $DEP_MAKE_PAK'			# the software package manager command to unload compile-time dependencies (to keep the environment clean)
 
 export LOG='/var/log/builder - ${NAME}.log'			# the log file for compile output (contains both stdout and stderr)
@@ -117,6 +118,7 @@ THIS="$0"							# stores this script for multi-pass calls
 CPU='a32,a64,i32,i64,m32,m64,p32,p64,r32,r64,v32,v64'		# the CPU architectures that you wish to compile for (comma separated): ARM 32/64bit, Intel/AMD 32/64bit, RPi 32/64big
 CWDL="$(pwd)"							# stores the current working directory location
 EXPORTS=''							# the exported compile flags based on the desired CPU architecture
+PACKAGE=''
 export TYPE='bin'						# the type of package being made (e.g. bin, dev, doc, ...)	NOTE: the -c action uses this default value
 TEMP=''								# stores a temporary value
 
@@ -424,19 +426,26 @@ package() {
 		[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$ID\"" | tee -a "$LOG"
 
 		for PACK in $TEMP; do
-			[ $DEBUG -gt 0 ] && echo -n "      DEBUG (Iterating): \"$PACK\"" | tee -a "$LOG"
+# REMOVED 2026/03/24
+#			[ $DEBUG -gt 0 ] && echo -n "      DEBUG (Iterating): \"$PACK\"" | tee -a "$LOG"
 			[ ! -d "${ID}.${PACK}" ] && {						# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
-				[ $DEBUG -gt 0 ] && echo " [skipped]" | tee -a "$LOG"
+				[ $DEBUG -gt 0 ] && echo "   DEBUG (Interating): \"$PACK\" [skipped]" | tee -a "$LOG"
 				continue
 			}
-			[ $DEBUG -gt 0 ] && echo " [processing]" | tee -a "$LOG"
+# REMOVED 2026/03/24
+#			[ $DEBUG -gt 0 ] && echo " [processing]" | tee -a "$LOG"
+
+			PACKAGE="$ID"
+			[ "$NAME_SUF" ] && ( [ "$PACK" != 'bin' ] || ( [ "$PACK" = 'bin' ] && [ "$NAME_BIN" ] ) ) && eval "PACKAGE=\"${ID}${NAME_SUF}\""
 
 			eval "PAK_DEPS=\"$EXT_DEPS\""						# update these values if variables were included in their name
 			eval "PAK_HASH=\"$EXT_HASH\""
 			eval "PAK_INFO=\"$EXT_INFO\""
 			eval "PAK_LIST=\"$EXT_LIST\""
-			[ ! "$EXT_BIND" ] && eval "PAK_SOFT=\"$EXT_SOFT\""
-			[ "$EXT_BIND" ] && eval "PAK_SOFT=\"$(echo \"$EXT_SOFT\" | sed 's/${EXT_BIND}//')\""					# remove any applicable naming convention from the software package name (e.g. -bin)
+			eval "PAK_SOFT=\"$EXT_SOFT\""
+# REMOVED 2026/03/24
+#			[ ! "$EXT_BIND" ] && eval "PAK_SOFT=\"$EXT_SOFT\""
+#			[ "$EXT_BIND" ] && eval "PAK_SOFT=\"$(echo \"$EXT_SOFT\" | sed 's/${EXT_BIND}//')\""					# remove any applicable naming convention from the software package name (e.g. -bin)
 
 			eval "URL_TEMP=\"${URL_INFO//NAME/ID}\""
 
@@ -449,22 +458,23 @@ package() {
 			}
 			echo "   ${ID} [${PACK}]"
 			echo -e "\n\n   ----- ${ID} ${PACK} -----\n\n" >>"$LOG"
-			[ "$SPM_MAKE" ] && eval "$SPM_MAKE"					# NOTE: we use a variable so any package manager can create a native package for their distro
+			[ "$SPM_MAKE" ] && { eval "$SPM_MAKE" || stop failed; }					# NOTE: we use a variable so any package manager can create a native package for their distro
 
 			( [ "$PACK" = 'all' ] || [ "$PACK" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
 			( [ "$PACK" = 'all' ] || [ "$PACK" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && echo -e "${DEP_EXEC_DEV}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
 			( [ "$PACK" = 'all' ] || [ "$PACK" = 'gir' ] ) && [ "$DEP_EXEC_GIR" ] && echo -e "${DEP_EXEC_GIR}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
 			( [ "$PACK" = 'all' ] || [ "$PACK" = 'lib' ] ) && [ "$DEP_EXEC_LIB" ] && echo -e "${DEP_EXEC_LIB}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
 
-			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
-			[ "$URL_INFO" ] && {							# download the existing information file
-				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
-				eval "wget -cq \"$URL_TEMP\" -O \"${DIR_REPO}/${ID}${PAK_INFO}\" 2>/dev/null"
-			}
+# REMOVED 2026/03/24 - this is stated by the package manager (since not all files have .info file [e.g. .deb]
+#			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
+#			[ "$URL_INFO" ] && {							# download the existing information file
+#				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
+#				eval "wget -cq \"$URL_TEMP\" -O \"${DIR_REPO}/${ID}${PAK_INFO}\" 2>/dev/null"
+#			}
 
-			mv "${ID}${PAK_SOFT}" "${ID}${PAK_LIST}" "${ID}${PAK_HASH}" "$DIR_REPO"
-			echo "   Your package is now available in: ${DIR_REPO}"			# copy the files into the repo
+			mv "${PACKAGE}${PAK_SOFT}" "${PACKAGE}${PAK_LIST}" "${PACKAGE}${PAK_HASH}" "$DIR_REPO"
 		done
+		echo "   Your packages are now available in: ${DIR_REPO}"			# copy the files into the repo
 	done
 	eval "$SUDO chown -hR ${USER} * >>\"$LOG\" 2>&1"					# update the ownership of all the package contents to be the current user so we can delete it
 
