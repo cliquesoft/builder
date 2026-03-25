@@ -255,3 +255,20 @@
 - Updated the EXT_ variable values
 - Updated post-packaging messaging
 
+2026/03/25
+- Created a config for TinyCore using pax
+- Updated NAME_SUF to NAME_SFX
+- Updated the sample config files
+- Updated PACK to TYPE in package() for consistency in naming
+- Updated ID to NAME in package() for consistency in naming
+- Updated the order of assignment in package()
+- Updated SPM_MAKE syntax
+- Updated variable names in stop() to prevent erroneous cleanup prompts
+- Updated the 'package' script
+- Updated the man page
+
+
+- Test with both alsa packages
+- Tested with TinyCore Linux
+
+

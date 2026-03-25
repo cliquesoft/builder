@@ -2,7 +2,7 @@
 # package	the script to package pax for various Linux distros
 #
 # created	2025/10/25 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/03/05 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/03/25 by Dave Henderson (support@cliquesoft.org)
 
 ( [ ! "$1" ] || [ "$1" = '--help' ] ) && {
 	echo
@@ -98,7 +98,10 @@ echo ' [done]'
 
 echo -n 'Making the various packages:'
 cd - >/dev/null
-[ "$1" = 'generic' ] && ( tar czf "../${PROJECT}-$(date +%Y.%m.%d).0.${EXT_SOFT}" . >>"$LOG" 2>&1 || exit 1 )
+[ "$1" = 'generic' ] && {
+	PROJECT="${PROJECT}-$(date +%Y.%m.%d).0"
+	tar czf "../${PROJECT}.${EXT_SOFT}" . >>"$LOG" 2>&1 || exit 1
+}
 [ "$1" != 'generic' ] && ( mksquashfs "./" "../${PROJECT}.${EXT_SOFT}" -b 4096 >>"$LOG" 2>&1 || exit 1 )
 echo -n ' [soft]'
 

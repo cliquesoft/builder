@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/24 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/25 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -63,33 +63,32 @@ export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}'				# the distro
 
 export SPM_ALL='$SUDO pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
 export SPM_PACK='$SUDO pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
-#export SPM_MAKE='$SUDO pax -S ./ -m ${ID} ${DIR_DUMP}/${ID}.${PACK}'		# the software package manager command to make a package from the compiled software by this script
-export SPM_MAKE='$SUDO pax -S ${DIR_DUMP}/${ID}.${PACK} -m ${PACKAGE} ${DIR_DUMP}'		# the software package manager command to make a package from the compiled software by this script
+export SPM_MAKE='$SUDO pax -S ${DIR_DUMP}/${NAME}.${TYPE} -m ${PACKAGE} ${DIR_DUMP}'		# the software package manager command to make a package from the compiled software by this script
 export SPM_UNLD='$SUDO pax -u $DEP_MAKE_PAK'			# the software package manager command to unload compile-time dependencies (to keep the environment clean)
 
 export LOG='/var/log/builder - ${NAME}.log'			# the log file for compile output (contains both stdout and stderr)
 export SUDO=''							# whether or not 'sudo' should be called for all commands after the 'ownership and permissions' have been set (if they are restrictive enough to warrant it)
 
-PATH_PKGCFG="${HOME}/.lib/pkgconfig:/Users/Public/.lib/pkgconfig:/lib/pkgconfig"  # the default PKG_CONFIG_PATH value
+PATH_PKGCFG="${HOME}/.lib/pkgconfig:/Users/Public/.lib/pkgconfig:/lib/pkgconfig"  		# the default PKG_CONFIG_PATH value
 
 # set default compile flags (which can be overwritten with DIR_CONF or individual DIR_PROF configs)
 # NOTE: additional flags can also be set in this variable as well (e.g. LC_CTYPE, QT_IM_MODULE, GTK_IM_MODULE, ...)
 FLAG_A32="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
 	export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
 	export LDFLAGS='-Wl,-O1'
-	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"		# ARM 32bit
+	export PKG_CONFIG_PATH='\${PATH_PKGCFG}'"		# ARM 32bit
 FLAG_A64="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 	export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 	export LDFLAGS='-Wl,-O1'
-	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"		# ARM 64bit
+	export PKG_CONFIG_PATH='\${PATH_PKGCFG}'"		# ARM 64bit
 FLAG_I32="export CFLAGS='-march=i486 -mtune=i686 -Os -pipe'
 	export CXXFLAGS='-march=i486 -mtune=i686 -Os -pipe'
 	export LDFLAGS='-Wl,-O1'
-	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"		# Intel/AMD 32bit
+	export PKG_CONFIG_PATH='\${PATH_PKGCFG}'"		# Intel/AMD 32bit
 FLAG_I64="export CFLAGS='-mtune=generic -Os -pipe'
 	export CXXFLAGS='-mtune=generic -Os -pipe'
 	export LDFLAGS='-Wl,-O1'
-	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"		# Intel/AMD 64bit
+	export PKG_CONFIG_PATH='\${PATH_PKGCFG}'"		# Intel/AMD 64bit
 FLAG_M32=""							# MIPS 32bit
 FLAG_M64=""							# MIPS 64bit
 FLAG_P32=""							# PowerPC 32bit
@@ -97,11 +96,11 @@ FLAG_P64=""							# PowerPC 64bit
 FLAG_R32="export CFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
 	export CXXFLAGS='-march=armv6zk -mtune=arm1176jzf-s -mfpu=vfp -Os -pipe'
 	export LDFLAGS='-Wl,-O1'
-	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"		# RPi 32bit
+	export PKG_CONFIG_PATH='\${PATH_PKGCFG}'"		# RPi 32bit
 FLAG_R64="export CFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 	export CXXFLAGS='-march=armv8-a+crc -mtune=cortex-a53 -Os -pipe'
 	export LDFLAGS='-Wl,-O1'
-	export PKG_CONFIG_PATH='${PATH_PKGCFG}'"		# RPi 64bit
+	export PKG_CONFIG_PATH='\${PATH_PKGCFG}'"		# RPi 64bit
 FLAG_V32=""							# RISC-V 32bit
 FLAG_V64=""							# RISC-V 64bit
 
@@ -241,13 +240,14 @@ stop() {
 		for DIR in $NAMES; do
 			rm -Rf "${DIR_TEMP:?}/${DIR}/"* 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
+			rm -Rf "${DIR_TEMP:?}/${DIR}.make" 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.pass" 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
 
 			[ -d "${DIR_DUMP:?}/${DIR}" ] && rm -Rf "${DIR_DUMP:?}/${DIR}/"* 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
 			for PACK in bin dev doc drv gir lib loc; do
-				if [ -d "${DIR_DUMP:?}/${DIR}.${TYPE}" ]; then
-					rm -Rf "${DIR_DUMP:?}/${DIR}.${TYPE}" 2>>"$LOG" || {
+				if [ -d "${DIR_DUMP:?}/${DIR}.${PACK}" ]; then
+					rm -Rf "${DIR_DUMP:?}/${DIR}.${PACK}" 2>>"$LOG" || {
 						echo "ERROR: This step failed to complete, check the log for details."
 						exit 1
 					}
@@ -352,6 +352,7 @@ package() {
 	fi
 
 	# NOTE: we should only apply ownership and permissions on the final pass!!!
+	#	do NOT overwrite the TEMP value!!!
 	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then						# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
 		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"		# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when METHOD=custom (e.g. FXwm)
 		for DIR in $NAMES; do
@@ -422,60 +423,48 @@ package() {
 	[ $DEBUG -gt 0 ] && echo "   DEBUG (NAMES): \"$NAMES\""
 												# NOTE: list all contents | non-greedy sed to remove extension (e.g. .bin) | sort to remove duplicates
 	echo -e "\nCreating the various packages..." | tee -a "$LOG"
-	for ID in $NAMES; do									# NOTE: the ID variable will contain directory names, or the actual names of the packages - depending on configuration
-		[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$ID\"" | tee -a "$LOG"
+	OLD_NAME="$NAME"									# store the original values (since they get overwritten below to maintain consistency in naming conventions in the config files)
+	OLD_TYPE="$TYPE"
+	for NAME in $NAMES; do									# NOTE: the NAME variable will contain directory names, or the actual names of the packages - depending on configuration
+		[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$NAME\"" | tee -a "$LOG"
 
-		for PACK in $TEMP; do
-# REMOVED 2026/03/24
-#			[ $DEBUG -gt 0 ] && echo -n "      DEBUG (Iterating): \"$PACK\"" | tee -a "$LOG"
-			[ ! -d "${ID}.${PACK}" ] && {						# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
-				[ $DEBUG -gt 0 ] && echo "   DEBUG (Interating): \"$PACK\" [skipped]" | tee -a "$LOG"
+		for TYPE in $TEMP; do
+			[ ! -d "${NAME}.${TYPE}" ] && {						# if a 'pre/post' script created directories manually, then some may be missing so no reason to process something that doesn't exist!
+				[ $DEBUG -gt 0 ] && echo "   DEBUG (Interating): \"$TYPE\" [skipped]" | tee -a "$LOG"
 				continue
 			}
-# REMOVED 2026/03/24
-#			[ $DEBUG -gt 0 ] && echo " [processing]" | tee -a "$LOG"
 
-			PACKAGE="$ID"
-			[ "$NAME_SUF" ] && ( [ "$PACK" != 'bin' ] || ( [ "$PACK" = 'bin' ] && [ "$NAME_BIN" ] ) ) && eval "PACKAGE=\"${ID}${NAME_SUF}\""
+			PACKAGE="$NAME"								# store the value to possibly append NAME_SFX below
+			[ "$NAME_SFX" ] && ( [ "$TYPE" != 'bin' ] || ( [ "$TYPE" = 'bin' ] && [ "$NAME_BIN" ] ) ) && eval "PACKAGE=\"${NAME}${NAME_SFX}\""
 
 			eval "PAK_DEPS=\"$EXT_DEPS\""						# update these values if variables were included in their name
 			eval "PAK_HASH=\"$EXT_HASH\""
 			eval "PAK_INFO=\"$EXT_INFO\""
 			eval "PAK_LIST=\"$EXT_LIST\""
 			eval "PAK_SOFT=\"$EXT_SOFT\""
-# REMOVED 2026/03/24
-#			[ ! "$EXT_BIND" ] && eval "PAK_SOFT=\"$EXT_SOFT\""
-#			[ "$EXT_BIND" ] && eval "PAK_SOFT=\"$(echo \"$EXT_SOFT\" | sed 's/${EXT_BIND}//')\""					# remove any applicable naming convention from the software package name (e.g. -bin)
 
-			eval "URL_TEMP=\"${URL_INFO//NAME/ID}\""
+			[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $NAME [${TYPE}], ${PACKAGE}${PAK_SOFT}" | tee -a "$LOG"
 
-			[ $DEBUG -gt 0 ] && echo "   DEBUG (Pak Info): $ID [${PACK}], ${ID}${PAK_SOFT}" | tee -a "$LOG"
-			[ $DEBUG -gt 0 ] && echo "   DEBUG (URL Info): $URL_TEMP" | tee -a "$LOG"
-
-			[ "$(ls -1 "${ID}.${PACK}" | head -1)" = '' ] && {			# if there are no contents for the iterated package, then no reason to execute the below segment
+			[ "$(ls -1 "${NAME}.${TYPE}" | head -1)" = '' ] && {			# if there are no contents for the iterated package, then no reason to execute the below segment
 				[ $DEBUG -gt 0 ] && echo "   DEBUG (skipped)" | tee -a "$LOG"
 				continue
 			}
-			echo "   ${ID} [${PACK}]"
-			echo -e "\n\n   ----- ${ID} ${PACK} -----\n\n" >>"$LOG"
-			[ "$SPM_MAKE" ] && { eval "$SPM_MAKE" || stop failed; }					# NOTE: we use a variable so any package manager can create a native package for their distro
+			echo "   ${NAME} [${TYPE}]"
+			echo -e "\n\n   ----- ${NAME} ${TYPE} -----\n\n" >>"$LOG"
+			[ "$SPM_MAKE" ] && { eval "$SPM_MAKE" || stop failed; }			# NOTE: we use a variable so any package manager can create a native package for their distro
 
-			( [ "$PACK" = 'all' ] || [ "$PACK" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
-			( [ "$PACK" = 'all' ] || [ "$PACK" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && echo -e "${DEP_EXEC_DEV}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
-			( [ "$PACK" = 'all' ] || [ "$PACK" = 'gir' ] ) && [ "$DEP_EXEC_GIR" ] && echo -e "${DEP_EXEC_GIR}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
-			( [ "$PACK" = 'all' ] || [ "$PACK" = 'lib' ] ) && [ "$DEP_EXEC_LIB" ] && echo -e "${DEP_EXEC_LIB}\n" | tr ' ' '\n' >>"${DIR_REPO}/${ID}${PAK_DEPS}"
-
-# REMOVED 2026/03/24 - this is stated by the package manager (since not all files have .info file [e.g. .deb]
-#			[ ! "$URL_INFO" ] && echo "   WARN: Don't forget to create the .info file for the package!" | tee -a "$LOG"
-#			[ "$URL_INFO" ] && {							# download the existing information file
-#				echo "   WARN: Don't forget to update the .info file for the package!" | tee -a "$LOG"
-#				eval "wget -cq \"$URL_TEMP\" -O \"${DIR_REPO}/${ID}${PAK_INFO}\" 2>/dev/null"
-#			}
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && echo -e "${DEP_EXEC_DEV}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'gir' ] ) && [ "$DEP_EXEC_GIR" ] && echo -e "${DEP_EXEC_GIR}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'lib' ] ) && [ "$DEP_EXEC_LIB" ] && echo -e "${DEP_EXEC_LIB}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
 
 			mv "${PACKAGE}${PAK_SOFT}" "${PACKAGE}${PAK_LIST}" "${PACKAGE}${PAK_HASH}" "$DIR_REPO"
 		done
 		echo "   Your packages are now available in: ${DIR_REPO}"			# copy the files into the repo
 	done
+	NAME="$OLD_NAME"									# restore the original values
+	TYPE="$OLD_TYPE"
+	unset OLD_NAME OLD_TYPE									# delete the variable
 	eval "$SUDO chown -hR ${USER} * >>\"$LOG\" 2>&1"					# update the ownership of all the package contents to be the current user so we can delete it
 
 	[ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.package" ] && {				# execute any existing final script (for single-pass; multi-pass is next line)
@@ -820,18 +809,18 @@ if [ ! "$TEMPLATE" ]; then
 	# NOTE: we can't eval the EXT_ variables here since they need to be interpritted at different times
 fi
 
-[ "$ARCH" = 'a32' ] && EXPORTS="$FLAG_A32"
-[ "$ARCH" = 'a64' ] && EXPORTS="$FLAG_A64"
-[ "$ARCH" = 'i32' ] && EXPORTS="$FLAG_I32"
-[ "$ARCH" = 'i64' ] && EXPORTS="$FLAG_I64"
-[ "$ARCH" = 'm32' ] && EXPORTS="$FLAG_M32"
-[ "$ARCH" = 'm64' ] && EXPORTS="$FLAG_M64"
-[ "$ARCH" = 'p32' ] && EXPORTS="$FLAG_P32"
-[ "$ARCH" = 'p64' ] && EXPORTS="$FLAG_P64"
-[ "$ARCH" = 'r32' ] && EXPORTS="$FLAG_R32"
-[ "$ARCH" = 'r64' ] && EXPORTS="$FLAG_R64"
-[ "$ARCH" = 'v32' ] && EXPORTS="$FLAG_V32"
-[ "$ARCH" = 'v64' ] && EXPORTS="$FLAG_V64"
+[ "$ARCH" = 'a32' ] && eval "EXPORTS=\"$FLAG_A32\""
+[ "$ARCH" = 'a64' ] && eval "EXPORTS=\"$FLAG_A64\""
+[ "$ARCH" = 'i32' ] && eval "EXPORTS=\"$FLAG_I32\""
+[ "$ARCH" = 'i64' ] && eval "EXPORTS=\"$FLAG_I64\""
+[ "$ARCH" = 'm32' ] && eval "EXPORTS=\"$FLAG_M32\""
+[ "$ARCH" = 'm64' ] && eval "EXPORTS=\"$FLAG_M64\""
+[ "$ARCH" = 'p32' ] && eval "EXPORTS=\"$FLAG_P32\""
+[ "$ARCH" = 'p64' ] && eval "EXPORTS=\"$FLAG_P64\""
+[ "$ARCH" = 'r32' ] && eval "EXPORTS=\"$FLAG_R32\""
+[ "$ARCH" = 'r64' ] && eval "EXPORTS=\"$FLAG_R64\""
+[ "$ARCH" = 'v32' ] && eval "EXPORTS=\"$FLAG_V32\""
+[ "$ARCH" = 'v64' ] && eval "EXPORTS=\"$FLAG_V64\""
 
 
 # check the directories						  NOTE: we can't write to a log yet since those checks are occurring
@@ -1336,7 +1325,7 @@ fi
 # CHECK FOR PRIOR FAILED ATTEMPTS
 
 # if any directory exists -AND- we are doing a single pass -or- on the first pass of a multi-pass (via cli or params file) and the .pass file doesn't exist (via 'stop failed'), then...
-if ( [ -d "${DIR_DUMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}" ] || [ -d "${DIR_TEMP}/${NAME}.bin" ] ) && ( [ ! "$PASS" ] || ( [ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] ) ); then
+if ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) || [ -d "${DIR_DUMP}/${NAME}.bin" ]; then
 	echo -n "It appears a prior (attempted) compile has left files, cleanup? [Y/N] (N): "
 	read
 	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0				# NOTE: the script does NOT stop here if 'yes' was requested
@@ -1625,6 +1614,7 @@ if [ "$PATCH" ]; then
 		done 2>/dev/null
 	fi
 	IFS="$OLDIFS"
+	unset OLDIFS
 fi
 
 
