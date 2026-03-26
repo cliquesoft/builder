@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/25 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/03/26 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -501,8 +501,8 @@ eval "NAME=\${$#}"										# store the current last passed value (which should 
 
 # LOAD SWITCH DEFAULTS
 
-[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/params" ] && . "${DIR_PROF}/${NAME}/params"		# Profile parameters
-[ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/params.${PASS}" ] && . "${DIR_PROF}/${NAME}/params.${PASS}"						# ditto, but for multi-pass
+[ -e "${DIR_PROF}/${NAME}/params" ] && . "${DIR_PROF}/${NAME}/params"				# Profile parameters (general)
+[ -e "${DIR_PROF}/${NAME}/params.${PASS}" ] && . "${DIR_PROF}/${NAME}/params.${PASS}"		# ditto, but for multi-pass (specific)
 
 
 
@@ -745,6 +745,15 @@ TEMP=0
 [ $TEMP -gt 1 ] && [ ! "$CREATE" ] && [ ! "$REPACK" ] && [ ! "$TEMPLATE" ] && [ ! "$UNINSTALL" ] && TEMP=1					# if the -d, -i, and -{b|c} were chained, that is permissible, any other chained actions are not!
 [ $TEMP -gt 1 ] && { echo "ERROR: These ACTIONs can't be chained, use only one of them."; exit 1; }
 [ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
+
+# option adjustments						  NOTE: this adjusts parameters that were read in the 'params' files at the top even though a -b was not passed to make sure the below tests are not triggered
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -A') && { ARCH=''; }
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -C') && { SOURCE=''; }
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -D') && { DIRS=''; }
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -F') && { SKIP='TRUE'; }
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -M') && { METHOD=''; }
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -N') && { PASS=''; }
+[ ! "$BUILD" ] && ( ! echo "$EXE_CMD" | grep -q ' -R') && { TRIM=''; }
 
 # option checking
 [ "$ARCH" ] && [ ! "$BUILD" ] && { echo "The -A option can't be used with this action."; exit 1; }
@@ -1258,7 +1267,7 @@ elif [ "$TEMPLATE" ]; then
 
 
 elif [ "$UNINSTALL" ]; then
-	echo -n "Uninstalling the requested builder profile:" | tee -a "$LOG"
+	echo -n "Uninstalling the builder profile:" | tee -a "$LOG"
 
 	eval "EXT_BLDR=\"$EXT_BLDR\""
 
@@ -1366,6 +1375,7 @@ fi
 	echo "   PASS: $PASS" | tee -a "$LOG"
 	echo "   SKIP: $SKIP" | tee -a "$LOG"
 	echo "   TRIM: $TRIM" | tee -a "$LOG"
+	echo "   TYPE: $TYPE" | tee -a "$LOG"
 	echo "   METH: $METHOD" | tee -a "$LOG"
 	echo "   SRCE: $SOURCE" | tee -a "$LOG"
 	echo | tee -a "$LOG"

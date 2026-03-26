@@ -177,6 +177,7 @@
 - Added EXT_BIND
 
 2026/03/10
+- Started testing with burn profile
 - Added .info value checks to the -C option
 - Added a check for the existence of DIR_PROF
 - Added option checks combined with appropriate actions
@@ -267,8 +268,9 @@
 - Updated the 'package' script
 - Updated the man page
 
-
-- Test with both alsa packages
-- Tested with TinyCore Linux
-
+2026/03/26
+- Started testing with alsa profiles
+- Added a section to undo 'params' file variables if -b was not passed
+- Removed conditions for the 'params' file parsing
+- Updated some verbiage for the -u action
 
