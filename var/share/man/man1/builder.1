@@ -135,13 +135,15 @@ can be adjusted using passed values to builder.
 While not a configuration file, there is one other file that needs to be
 discussed. This file also would reside alongside the 'config' in each
 builder profile, and is named 'params'. Like its associated 'config', this
-file can also have numeric file extensions for multi-pass profiles. The
-function of this file is to define the parameter values that should be
-passed to builder when building software. This will prevent mistakes by
-end users who would not know what values to pass. For example, if the
-software required two passes, instead of informing every end user to pass
-'-N 2', you can simply add a 'PASS=2' value in this file and builder will
-acknowledge that for the absence of the passed parameter.
+file can also have numeric file extensions for multi-pass profiles. Unlike
+the 'config' files, there can be a 'params' file without a numeric suffix
+for common values when used in a multi-pass profile. The function of this
+file is to define the parameter values that should be passed to builder
+when building software. This will prevent mistakes by end users who would
+not know what values to pass. For example, if the software required two
+passes, instead of informing every end user to pass '-N 2', you can simply
+add a 'PASS=2' value in this file and builder will acknowledge that for
+the absence of the passed parameter.
 
 To summarize:
   o The global config search order:

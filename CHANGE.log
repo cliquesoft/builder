@@ -269,8 +269,18 @@
 - Updated the man page
 
 2026/03/26
-- Started testing with alsa profiles
+- Updated the alsa profile
+- Started testing with alsa profile
 - Added a section to undo 'params' file variables if -b was not passed
 - Removed conditions for the 'params' file parsing
 - Updated some verbiage for the -u action
+
+2026/03/31
+- Updated the alsa profile (multiple times)
+- Added a quit option if presented with previous attempts prompt
+- Added an 'else' as a value to stop() to exit with an exit code
+- Moved the PASS value processing into a function
+- Updated the param file processing
+- Updated the -u action to not process profile files
+- Updated the man page
 
