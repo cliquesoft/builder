@@ -284,3 +284,10 @@
 - Updated the -u action to not process profile files
 - Updated the man page
 
+2026/04/01
+- Added the NAME.pid file
+- Updated the alsa profile
+- Updated the next pass calling code so the proper parameters are passed
+- Updated the compile calls for each CPU architecture
+- Updated the directory to enter code from the download source code block
+

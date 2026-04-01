@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/03/31 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/01 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -218,7 +218,7 @@ export FLAG_MAKE=''						# the flags to pass to the 'make' call
 
 # Syntax: stop TYPE [EXIT]
 # Exits gracefully by cleaning up the desired parts of the file system after a failed build
-# TYPE		[string] the type of cleanup to perform: failed, clean (for multi-pass), proper, normal
+# TYPE		[string] the type of cleanup to perform: failed, clean (for multi-pass), proper, quit, normal
 # EXIT		[number] if the function should exit this script afterwards: 0=no, 1=yes (default)
 #		[ NOTE ] if TYPE != 'failed,clean,proper' this value becomes the exit code
 stop() {
@@ -230,7 +230,8 @@ stop() {
 	}
 
 	if [ "$1" = 'failed' ]; then
-		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"	# we just delete this file to prevent issues
+		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"	# we just delete these two files to prevent issues
+		rm -Rf "${DIR_TEMP:?}/${NAME}.pid" 2>>"$LOG"
 		exit 1
 	elif [ "$1" = 'clean' ]; then
 		rm -Rf "${DIR_DUMP:?}/${NAME}/"* 2>>"$LOG"	# NOTE: the ':?' prevents the expression from evaluating to 'rm /*'
@@ -242,7 +243,10 @@ stop() {
 			rm -Rf "${DIR_TEMP:?}/${DIR}/"* 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.make" 2>>"$LOG"
-			rm -Rf "${DIR_TEMP:?}/${DIR}.pass" 2>>"$LOG"
+# UPDATED 2026/04/01
+#			rm -Rf "${DIR_TEMP:?}/${DIR}.pass" 2>>"$LOG"
+			[ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] && rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
+			[ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] && rm -Rf "${DIR_TEMP:?}/${NAME}.pid" 2>>"$LOG"
 			rm -Rf "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
 
 			[ -d "${DIR_DUMP:?}/${DIR}" ] && rm -Rf "${DIR_DUMP:?}/${DIR}/"* 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
@@ -288,7 +292,8 @@ echo 'pass() process'
 	PASS="$(cat "${DIR_TEMP}/${NAME}.pass")"
 	TEMP=${PASS%|*}										#   store the total passes required
 	PASS=${PASS#*|}										#   store the prior pass value
-	[ "$1" = 'INC' ] && PASS=$(( PASS + 1 ))						#   increase the value by 1 if instructed to
+#	[ "$1" = 'INC' ] && PASS=$(( PASS + 1 ))						#   increase the value by 1 if instructed to
+	PASS=$(( PASS + 1 ))									#   increase the value by 1 if instructed to
 	[ $PASS -gt $TEMP ] && stop proper							#   if we have just completed the last requred pass, then cleanup and exit
 	[ "$1" = 'INC' ] && echo "$TEMP|$PASS" >"${DIR_TEMP}/${NAME}.pass"			#   if we've made it here, we still have at least one pass to perform, so update the values!
 }
@@ -426,12 +431,14 @@ package() {
 
 
 	# CREATE EACH PACKAGE
-echo "skip pass|$SKIP|$PASS|"
+echo "skip pass|$SKIP|$PASS|$(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//')"
+# default value is SKIP=TRUE
 	[ ! "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && {
+echo 'skipping packaging since were not on the last pass yet...'
 		[ $DEBUG -gt 0 ] && echo "   DEBUG: The -F and -N were passed, but we're not on the last pass."
 		return 0									# if '-F' was passed -AND- '-N' was passed -AND- we are on the last pass, then exit this function
 	}
-
+echo 'oops! packaging'
 	cd "${DIR_DUMP}" 2>>"$LOG" || {								# change into the temp packaging directory
 		echo "Calling: cd \"$DIR_DUMP\"" >>"$LOG"
 		echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
@@ -1379,20 +1386,21 @@ echo "TYPE 6 |$TYPE|"
 # BEGIN THE BUILD/COMPILE PROCESS
 
 # for optional values not configured above
-if [ "$ARCH" = 'all' ]; then					# if we need to compile all architectures, then...
-	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do		# call this script for all supported CPU architectures and exit
-		TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
-		[ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"
-		[ "$DIRS" ] && TEMP="$TEMP -D"
-		[ "$PASS" ] && TEMP="$TEMP -N $PASS"
-		[ "$PATCH" ] && TEMP="$TEMP -P"
-		[ "$SKIP" ] && TEMP="$TEMP -F"
-		[ "$SINGLE" ] && TEMP="$TEMP -S"
-		[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
-		[ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
-		[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
+if [ "$ARCH" = 'all' ]; then									# if we need to compile all architectures, then...
+	for ARCH in $(echo ${CPU} | sed 's/,/ /g'); do						# call this script for all supported CPU architectures and exit
+		TEMP="$THIS -A $ARCH"								# since this value can NOT change, add it in no matter what
+		( ! grep -q ^'METHOD=' "${DIR_PROF}/${NAME}/params"* ) && TEMP="$TEMP -M $METHOD"						# if this parameter is NOT in any of the param files, then it was either the default value -or- passed via command line, so we need to keep that value
+		( ! grep -q ^'PASS=' "${DIR_PROF}/${NAME}/params"* ) && [ "$PASS" ] && TEMP="$TEMP -N $PASS"					# all of these values follow the above comment
+		( ! grep -q ^'SOURCE=' "${DIR_PROF}/${NAME}/params"* ) && [ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"
+		( ! grep -q ^"DIRS=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$DIRS" ] && TEMP="$TEMP -D"
+		( ! grep -q ^"PATCH=['']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$PATCH" ] && TEMP="$TEMP -P"
+		( ! grep -q ^"SKIP=['']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$SKIP" ] && TEMP="$TEMP -F"
+		( ! grep -q ^"SINGLE=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$SINGLE" ] && TEMP="$TEMP -S"
+		( ! grep -q ^'TRIM=' "${DIR_PROF}/${NAME}/params"* ) && [ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
+		( ! grep -q ^'TYPE=' "${DIR_PROF}/${NAME}/params"* ) && [ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
+		TEMP="$TEMP -b $BUILD $NAME"							# NOTE: there's no need to encapsulate the NAME in quotes since it won't contain spaces
 
-		eval "$TEMP \"$NAME\""
+		eval "$TEMP"
 	done
 	exit 0
 fi
@@ -1403,12 +1411,13 @@ fi
 # CHECK FOR PRIOR FAILED ATTEMPTS
 
 # if any directory exists -AND- we are doing a single pass -or- on the first pass of a multi-pass (via cli or params file) and the .pass file doesn't exist (via 'stop failed'), then...
-if ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) || [ -d "${DIR_DUMP}/${NAME}.bin" ]; then
+if ( [ ! "$PASS" ] && ( ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) || [ -d "${DIR_DUMP}/${NAME}.bin" ] ) ) || ( [ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] ); then
 	echo -n "It appears a prior (attempted) compile has left files, cleanup? [Y/N/Q] (N): "
 	read
 	[ "$REPLY" = 'Q' ] || [ "$REPLY" = 'q' ] && stop					# NOTE: the script does NOT stop here if 'yes' was requested
 	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0				# NOTE: the script does NOT stop here if 'yes' was requested
 fi
+[ ! -e "${DIR_TEMP}/${NAME}.pid" ] && echo $$ >"${DIR_TEMP}/${NAME}.pid"			# used to indicate if we're on successful multi-pass or restarting after a failure
 
 
 
@@ -1597,7 +1606,9 @@ if [ "$SOURCE" ]; then										# if we need to obtain the source code before we
 		esac
 		[ "$SOURCE" = 'git2' ] && SOURCE='git'						#    if the value had been temporarily changed above, we now need to change it back
 	fi
+fi
 
+if [ ! "$CODE" ]; then
 	echo -e "Detected:\n$(ls -tdpr -- * | grep '/'$)" >>"$LOG"
 	echo "Calling: cd \"$(ls -tdpr -- * | grep '/'$ | head -1)\"" >>"$LOG"
 	cd "$(ls -tdpr -- * | grep '/'$ | head -1)" 2>>"$LOG" || {				# change into the (unknown named) directory created by the copy/clone/uncompression above (source code directory)	https://unix.stackexchange.com/questions/136976/get-the-latest-directory-not-the-latest-file
@@ -1607,6 +1618,11 @@ if [ "$SOURCE" ]; then										# if we need to obtain the source code before we
 
 elif [ "$CODE" ]; then										# if we have a CODE value, then we need to change into that directory before we continue!
 	echo -e "\nEntering source code directory..." | tee -a "$LOG"
+echo '----'
+ls -1dp -- * | grep ^"$CODE" | grep '/'$ | head -1
+echo '----'
+ls -1dp -- * | grep ^"$CODE" | grep '/'$
+echo '----'
 
 	echo -e "Detected:\n$(ls -1dp -- * | grep ^"$CODE" | grep '/'$ | head -1)" >>"$LOG"
 	TEMP="$(ls -1dp -- * | grep ^"$CODE" | grep '/'$ | head -1)"
@@ -1614,6 +1630,7 @@ elif [ "$CODE" ]; then										# if we have a CODE value, then we need to chang
 		echo "ERROR: The source code directory could not be found." >>"$LOG"
 		stop failed
 	}
+echo "dir |$TEMP|"
 	echo "Calling: cd \"$TEMP\"" >>"$LOG"
 	cd "$TEMP" 2>>"$LOG" || {								# change into the directory that matches the unique CODE value
 		echo "ERROR: The source code directory could not be entered." >>"$LOG"
@@ -1895,22 +1912,27 @@ fi
 	echo -e "\nStarting the next pass..." | tee -a "$LOG"
 # passed D P F T lib U alsa
 # LEFT OFF - if any of these are in the 'params' or 'params.*' files, then do NOT include them below!
-	TEMP='"$THIS" -A "$ARCH" -M "$METHOD"'
-	[ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"
-	[ "$DIRS" ] && TEMP="$TEMP -D"
+
+	TEMP="$THIS -A $ARCH"									# since this value can NOT change, add it in no matter what
 	#[ "$PASS" ] && TEMP="$TEMP -N $PASS"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
-	[ "$PATCH" ] && TEMP="$TEMP -P"
-	[ "$SKIP" ] && TEMP="$TEMP -F"
-	[ "$SINGLE" ] && TEMP="$TEMP -S"
-	[ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
-	[ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
-	[ ! "$UNLOAD" ] && TEMP="$TEMP -U"
+	( ! grep -q ^'METHOD=' "${DIR_PROF}/${NAME}/params"* ) && TEMP="$TEMP -M $METHOD"	# if this parameter is NOT in any of the param files, then it was either the default value -or- passed via command line, so we need to keep that value
+	( ! grep -q ^'SOURCE=' "${DIR_PROF}/${NAME}/params"* ) && [ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"				# all of these values follow the above comment
+	( ! grep -q ^"DIRS=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$DIRS" ] && TEMP="$TEMP -D"
+	( ! grep -q ^"PATCH=['']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$PATCH" ] && TEMP="$TEMP -P"
+	( ! grep -q ^"SKIP=['']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$SKIP" ] && TEMP="$TEMP -F"
+	( ! grep -q ^"SINGLE=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$SINGLE" ] && TEMP="$TEMP -S"
+	( ! grep -q ^'TRIM=' "${DIR_PROF}/${NAME}/params"* ) && [ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
+	( ! grep -q ^'TYPE=' "${DIR_PROF}/${NAME}/params"* ) && [ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
+	TEMP="$TEMP -b $BUILD $NAME"				# NOTE: there's no need to encapsulate the NAME in quotes since it won't contain spaces
 
-	cd "$CWDL"
-
-	eval "$TEMP \"$NAME\""
-	exit 0
-}
+# REMOVED 2026/04/01
+#	cd "$CWDL"
+#
+#	eval "$TEMP \"$NAME\""
+#	exit 0
+echo "execing |$TEMP|"
+	exec $TEMP						# re-launch builder using the adjusted parameters
+}								# NOTE: exec will replace this invocation of the script with the above line	https://stackoverflow.com/questions/18351198/what-are-the-uses-of-the-exec-command-in-shell-scripts
 
 [ "$BUILD" = 'install' ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
 [ "$BUILD" = 'package' ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"
