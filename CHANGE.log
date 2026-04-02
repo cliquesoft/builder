@@ -291,3 +291,15 @@
 - Updated the compile calls for each CPU architecture
 - Updated the directory to enter code from the download source code block
 
+2026/04/02
+- Updated the alsa profile (multiple times)
+- Added DEPS variable
+- Added SPM_DEPS variable
+- Rearranged the prior failure check and the PASS assignment
+- Updated the -t action output
+- Updated the default SPM_ALL and SPM_PACK variable values to include '-L none'
+- Updated the default SPM_UNLD value to include '-u unload'
+- Updated all the included config files
+- Updated stop() to delete appropriate data
+- Updated the man page
+

@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/01 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/02 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -61,10 +61,11 @@ export PRM_EXECS='755'						# the permissions to apply to all executables in /bi
 export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_INFO}'		# the .info file URL used to obtain the package source code (set in builder config file)
 export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}'				# the distro repo URL used to obtain the package source code and builder profiles (set in builder config file)
 
-export SPM_ALL='$SUDO pax -i $DEP_MAKE_ALL'			# the software package manager command to install compile-time dependencies (overall)
-export SPM_PACK='$SUDO pax -i $DEP_MAKE_PAK'			# the software package manager command to install compile-time dependencies (package specific)
+export SPM_ALL='$SUDO pax -L none -i $DEP_MAKE_ALL'		# the software package manager command to install compile-time dependencies (overall)
+export SPM_PACK='$SUDO pax -L none -i $DEP_MAKE_PAK'		# the software package manager command to install compile-time dependencies (package specific)
+export SPM_DEPS='$SUDO pax -L none -S $DIR_REPO -i $DEPS'	# the software package manager command to install the built package if it's a dependency for a future pass (e.g. alsa-libs)
 export SPM_MAKE='$SUDO pax -S ${DIR_DUMP}/${NAME}.${TYPE} -m ${PACKAGE} ${DIR_DUMP}'		# the software package manager command to make a package from the compiled software by this script
-export SPM_UNLD='$SUDO pax -u $DEP_MAKE_PAK'			# the software package manager command to unload compile-time dependencies (to keep the environment clean)
+export SPM_UNLD='$SUDO pax -u unload $DEP_MAKE_PAK'		# the software package manager command to unload compile-time dependencies (to keep the environment clean)
 
 export LOG='/var/log/builder - ${NAME}.log'			# the log file for compile output (contains both stdout and stderr)
 export SUDO=''							# whether or not 'sudo' should be called for all commands after the 'ownership and permissions' have been set (if they are restrictive enough to warrant it)
@@ -136,7 +137,7 @@ UNINSTALL=''							# indicates we need to uninstall the builder profile
 
 # [options]
 export ARCH=''							# the current CPU architecture being compiled (e.g. i32, i64, ...)
-DIRS=''								# indicates we need to package using directory names instead of just a directory named NAME
+export DIRS=''							# indicates we need to package using directory names instead of just a directory named NAME
 INFOFILE=''							# stores the info file to download/use to obtain the software
 export PASS=''							# the number of passes to make during compile (blank disables)
 PATCH='TRUE'							# indicates we need to apply patches to the source code
@@ -153,6 +154,7 @@ export CLEAN=0							# indicates that the 'make clean' step is necessary (mostly
 export CONF=0							# indicates that the 'configure' step needs to be made during compile
 export PROP=0							# indicates that the 'make mrproper' step is necessary (mostly for multi-run compiles)
 export TEST=0							# indicates that the 'make test' step is requested to be made during compile
+export DEPS=''							# indicates that the package is a dependency for a future pass and to install it when PASS!=''
 export SORT=''							# indicates we need to sort the package contents on this pass
 export CODE=''							# when compiling multiple softwares with a single builder profile (e.g. alsa-lib, alsa-utils), this value uniquely identifies the package per pass (e.g. config.1 > CODE='alsa-lib'; config.2 > CODE='alsa-utils')
 
@@ -229,25 +231,38 @@ stop() {
 		eval "$SPM_UNLD 2>>\"$LOG\""
 	}
 
-	if [ "$1" = 'failed' ]; then
-		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"	# we just delete these two files to prevent issues
-		rm -Rf "${DIR_TEMP:?}/${NAME}.pid" 2>>"$LOG"
-		exit 1
-	elif [ "$1" = 'clean' ]; then
+# REMOVED 2026/04/02 - leave the files so a cleanup prompt can be issued (since everything will be dirty - deleting just these two files causes the cleanup prompt to not show)
+#	if [ "$1" = 'failed' ]; then
+#		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"	# we just delete these two files to prevent issues
+#		rm -Rf "${DIR_TEMP:?}/${NAME}.pid" 2>>"$LOG"
+#		exit 1
+#	elif [ "$1" = 'clean' ]; then
+	if [ "$1" = 'clean' ]; then
+# LEFT OFF - should we leave the below directory incase multi-pass needs compiled files for each iteration?
 		rm -Rf "${DIR_DUMP:?}/${NAME}/"* 2>>"$LOG"	# NOTE: the ':?' prevents the expression from evaluating to 'rm /*'
-		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"
+		rm -Rf "${DIR_TEMP:?}/${NAME}/"* 2>>"$LOG"
+# REMOVED 2026/04/02 - this can't be removed since this is called between passes
+#		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"
+		rm -Rf "${DIR_TEMP:?}/${DIR}.make" 2>>"$LOG"
+		rm -Rf "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
 		( [ ! "$2" ] || [ $2 -eq 1 ] ) && exit 1
 	elif [ "$1" = 'proper' ]; then
 		[ ! "$NAMES" ] && NAMES="$NAME"			# if the 'packaging' stage hasn't been reached yet, the only directory that would possibly exist would just be NAME
 		for DIR in $NAMES; do
+			# files
+# REMOVED 2026/04/02 - this doesn't appear to be used any longer
+#			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.make" ] && rm -Rf "${DIR_TEMP}/${DIR}.make" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.pass" ] && rm -Rf "${DIR_TEMP}/${DIR}.pass" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.sort" ] && rm -Rf "${DIR_TEMP}/${DIR}.sort" 2>>"$LOG"
+			# NOTE: only delete these files if the pid doesn't match the current run
+			if [ -e "${DIR_TEMP}/${DIR}.pid" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ]; then
+				[ -e "${DIR_TEMP}/${NAME}.pass" ] && rm -Rf "${DIR_TEMP}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
+				[ -e "${DIR_TEMP}/${NAME}.pid" ] && rm -Rf "${DIR_TEMP}/${NAME}.pid" 2>>"$LOG"
+			fi
+
+			# directories
 			rm -Rf "${DIR_TEMP:?}/${DIR}/"* 2>>"$LOG"
-			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
-			rm -Rf "${DIR_TEMP:?}/${DIR}.make" 2>>"$LOG"
-# UPDATED 2026/04/01
-#			rm -Rf "${DIR_TEMP:?}/${DIR}.pass" 2>>"$LOG"
-			[ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] && rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
-			[ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] && rm -Rf "${DIR_TEMP:?}/${NAME}.pid" 2>>"$LOG"
-			rm -Rf "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
 
 			[ -d "${DIR_DUMP:?}/${DIR}" ] && rm -Rf "${DIR_DUMP:?}/${DIR}/"* 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
 			for PACK in bin dev doc drv gir lib loc; do
@@ -390,9 +405,9 @@ package() {
 		TEMP='bin dev doc drv gir lib loc'						# store all the directories the files were separated into
 	fi
 
-	# NOTE: we should only apply ownership and permissions on the final pass!!!
+	# NOTE: we should only apply ownership and permissions on the final pass (or if the package is a dependency for an upcoming multi-pass package)!!!
 	#	do NOT overwrite the TEMP value!!!
-	if [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then						# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
+	if [ "$DEPS" ] || [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then						# if '-p' wasn't passed -OR- it was -and- we are on the last pass, then...
 		echo -e "\nApplying ownership and permissions..." | tee -a "$LOG"		# NOTE: this has to come below the 'post' script incase that is what handles the 'install' portion when METHOD=custom (e.g. FXwm)
 		for DIR in $NAMES; do
 			[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$DIR\"" | tee -a "$LOG"
@@ -1086,13 +1101,13 @@ elif [ "$TEMPLATE" ]; then
 		echo "clone:		.git" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
 		echo "repo:		http://distro.com/path/to/repo" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
 		echo -n "package:	" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
-		eval "echo \"example-1.2.3.${EXT_SOFT}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
+		eval "echo \"example-1.2.3${EXT_SOFT}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
 		echo -n "source:		" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
-		eval "echo \"example-1.2.3.${EXT_CODE}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
+		eval "echo \"example-1.2.3${EXT_CODE}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
 		echo -n "builder:	" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
-		eval "echo \"example-1.2.3.${EXT_BLDR}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
+		eval "echo \"example-1.2.3${EXT_BLDR}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
 		echo -n "compile:	" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
-		eval "echo \"example-1.2.3.${EXT_MAKE}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
+		eval "echo \"example-1.2.3${EXT_MAKE}\" >>\"${DIR_TEMP}/${NAME}${EXT_INFO}\""
 		echo "size:		100K" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
 		echo "installed:	150K" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
 		echo "category:	system	# education|games|multimedia|productivity|social|system|utilities" >>"${DIR_TEMP}/${NAME}${EXT_INFO}"
@@ -1244,6 +1259,7 @@ elif [ "$TEMPLATE" ]; then
 		echo "CONF=1		# configure" >>config
 		echo "PROP=0		# make mrproper" >>config
 		echo "TEST=0		# make test" >>config
+		echo "DEPS=''		# installs package after building; is a dependency for a later pass" >>config
 		echo "SORT=TRUE	# indicates the package contents need sorting (on this pass)" >>config
 		echo "# The below variable is optional and should only be used when compiling more" >>config
 		echo "# than one software with a single builder profile. For example you can compile" >>config
@@ -1410,19 +1426,23 @@ fi
 
 # CHECK FOR PRIOR FAILED ATTEMPTS
 
-# if any directory exists -AND- we are doing a single pass -or- on the first pass of a multi-pass (via cli or params file) and the .pass file doesn't exist (via 'stop failed'), then...
-if ( [ ! "$PASS" ] && ( ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) || [ -d "${DIR_DUMP}/${NAME}.bin" ] ) ) || ( [ "$PASS" ] && [ ! -e "${DIR_TEMP}/${NAME}.pass" ] ); then
+# if we're doing a single pass -or- on the first pass of a multi-pass -AND- any of these files/directories exist, then...
+# NOTE: we check for .pid since that get generated no matter if single or multi-pass
+#if ( [ ! "$PASS" ] || [ $PASS -eq 1 ] ) && ( [ -e "${DIR_TEMP}/${NAME}.pid" ] || [ -d "${DIR_DUMP}/${NAME}.bin" ] || ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) ); then
+if ( [ ! "$PASS" ] || [ $$ -ne "$(cat ${DIR_TEMP}/${NAME}.pid)" ] ) && ( [ -d "${DIR_DUMP}/${NAME}.bin" ] || ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) ); then
 	echo -n "It appears a prior (attempted) compile has left files, cleanup? [Y/N/Q] (N): "
 	read
 	[ "$REPLY" = 'Q' ] || [ "$REPLY" = 'q' ] && stop					# NOTE: the script does NOT stop here if 'yes' was requested
 	[ "$REPLY" = 'Y' ] || [ "$REPLY" = 'y' ] && stop proper 0				# NOTE: the script does NOT stop here if 'yes' was requested
 fi
-[ ! -e "${DIR_TEMP}/${NAME}.pid" ] && echo $$ >"${DIR_TEMP}/${NAME}.pid"			# used to indicate if we're on successful multi-pass or restarting after a failure
 
 
 
 
-# GET/SET THE 'PASS' AND 'SUDO' VALUES				  NOTE: the DIR_TEMP value will already be (re)set by this point
+# GET/SET THE 'SUDO', 'PID', AND 'PASS' VALUES				  NOTE: the DIR_TEMP value will already be (re)set by this point
+
+( [ "$SUDO" = 'TRUE' ] || [ "$SUDO" = '1' ] ) && SUDO='sudo'	# update the value to be the binary name so we can use it like "$SUDO mv ..."	NOTE: to use 'sudo' with parameters, simply add them for the SUDO value in the /etc/builder/config file (e.g. SUDO='sudo -x -y -z')
+echo "$$" >"${DIR_TEMP}/${NAME}.pid"				# used to indicate if we're on successful multi-pass or restarting after a failure
 
 # UPDATED 2026/03/31
 #[ -e "${DIR_TEMP}/${NAME}.pass" ] && {				# if we are on one of the multi-passes, then...    WARNING: this has to be processed in this order -AND- do NOT test for PASS value since it does NOT get passed on subsequent calls!
@@ -1439,8 +1459,6 @@ fi
 	echo "${PASS}|1" >"${DIR_TEMP}/${NAME}.pass"		#   stored value in format of: TOTAL|CURRENT
 	PASS=1							#   now store the value that we are working on the first pass
 }
-
-( [ "$SUDO" = 'TRUE' ] || [ "$SUDO" = '1' ] ) && SUDO='sudo'	# update the value to be the binary name so we can use it like "$SUDO mv ..."	NOTE: to use 'sudo' with parameters, simply add them for the SUDO value in the /etc/builder/config file (e.g. SUDO='sudo -x -y -z')
 
 
 
@@ -1464,6 +1482,7 @@ fi
 	echo "   CLEAN: $CLEAN" | tee -a "$LOG"
 	echo "   CONF: $CONF" | tee -a "$LOG"
 	echo "   PROP: $PROP" | tee -a "$LOG"
+	echo "   DEPS: $DEPS" | tee -a "$LOG"
 	echo "   SORT: $SORT" | tee -a "$LOG"
 	echo "   TEST: $TEST" | tee -a "$LOG"
 	echo "   CODE: $CODE" | tee -a "$LOG"
@@ -1858,23 +1877,28 @@ done
 
 if [ "$BUILD" = 'package' ]; then								# if we are packaging, then call those routines
 	package
+	[ "$PASS" ] && [ "$DEPS" ] && { eval "$SPM_DEPS" || stop failed; }			# if we're doing multi-pass -AND- this package is a dependency for a future pass, then we need to install it now!
 
-elif [ "$BUILD" = 'install' ] && ( [ ! "$PASS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then			# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
-	# NOTE: this is a separate step since builder ALWAYS installs to the
-	# staging directory so 'include' files can be added before installation
+# LEFT OFF - we need to adjust the below PASS conditions so something like the above can take place
+elif [ "$BUILD" = 'install' ]; then								# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
+	# if we're not doing a multi-pass -OR- we are and have a DEPS value -OR- we are and are on the last pass, then...
+	if [ ! "$PASS" ] || [ "$DEPS" ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ]; then
+		# NOTE: this is a separate step since builder ALWAYS installs to the
+		# staging directory so 'include' files can be added before installation
 
-	echo -e "\nInstalling the compiled software..." | tee -a "$LOG"
+		echo -e "\nInstalling the compiled software..." | tee -a "$LOG"
 
-	echo "Calling: cd \"${DIR_DUMP}/${NAME}\"" >>"$LOG"
-	cd "${DIR_DUMP}/${NAME}" 2>>"$LOG" || {							# change into the temp packaging directory
-		echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
-		stop failed
-	}
-	echo "Calling: $SUDO cp -dpR ./* /" >>"$LOG"
-	eval "$SUDO cp -dpR ./* / 2>>\"$LOG\"" || {						# now copy the contents to the root of the file system
-		echo "ERROR: The compiled software could not be installed." >>"$LOG"
-		stop failed
-	}
+		echo "Calling: cd \"${DIR_DUMP}/${NAME}\"" >>"$LOG"
+		cd "${DIR_DUMP}/${NAME}" 2>>"$LOG" || {						# change into the temp packaging directory
+			echo "ERROR: The staging location directory (DIR_DUMP) could not be entered." >>"$LOG"
+			stop failed
+		}
+		echo "Calling: $SUDO cp -dpR ./* /" >>"$LOG"
+		eval "$SUDO cp -dpR ./* / 2>>\"$LOG\"" || {					# now copy the contents to the root of the file system
+			echo "ERROR: The compiled software could not be installed." >>"$LOG"
+			stop failed
+		}
+	fi
 fi
 
 

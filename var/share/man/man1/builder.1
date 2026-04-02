@@ -300,6 +300,12 @@ Like SPM_ALL, this variable is also responsible for the installation of
 dependencies. However, this one works with the DEP_MAKE_PAK value defined
 in the builder profile 'config' file.
 
+.B SPM_DEPS
+The final variable associated with the installation of dependencies, this
+one is the command to install a package after it was built due to it being
+a dependency for another package in a multi-pass build. This one uses the
+DEPS variable value defined in the profile config[.#] files.
+
 .B SPM_MAKE
 The command listed for this variable needs to be all the commands required
 to create the package file(s). There are several variables available for
@@ -484,6 +490,17 @@ Indicates that a 'make mrproper' command needs to be run; 0=no, 1=yes
 
 .B TEST
 Indicates that a 'make test' command needs to be run; 0=no, 1=yes
+
+.B DEPS
+Indicates that the package that was just built is a dependency for another
+package in an upcoming pass (in a multi-pass builder call). This value
+would need to be the name of the generated package (since it can vary
+depending on the configuration parameters). For example, if alsa is being
+compiled collectively, the first package needs to be the 'lib' so it can
+be installed to build the 'bin' package afterwards. Therefore, the value
+in config.1 could be 'alsa-lib.tcz' (if that matches your package naming
+convention). A more dynamic value would be '${PACKAGE}${EXT_SOFT}' which
+allows for general naming, but may not satisfy every build.
 
 .B SORT
 Indicates the package contents need sorting (on this pass); a blank value
