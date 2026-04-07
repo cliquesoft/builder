@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/02 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/07 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -164,6 +164,7 @@ export URL_CODE=''						# the developer URL used to obtain the package source co
 export CUSTOM=''						# used when METHOD='custom'
 
 export DIR_BIN="${DIR_INST}/bin"				# software installation directory locations
+export DIR_DEVMAN="/etc/udev/rules.d"				# location for device manager files
 export DIR_ETC="${DIR_INST}/etc"
 export DIR_LIB="${DIR_INST}/lib"
 export DIR_SBIN="${DIR_INST}/bin"
@@ -291,18 +292,26 @@ stop() {
 #			 inc  - read the NAME.pass file and increment the PASS value by one
 # FILE		[string] the file to check: config, params
 pass() {
-	[ ! -e "${DIR_TEMP}/${NAME}.pass" ] && {						# if there are no passes -OR- no passes have been made yet (e.g. this is the initial invocation), then...
-		[ "$2" ] && [ -e "${DIR_PROF}/${NAME}/${2}.1" ] && {				#   if a FILE was passed -AND- the initial file exists, then...
+[ ! -e "${DIR_TEMP}/${NAME}.pass" ] && echo 'NAME.pass does NOT exist...'
+[ -e "${DIR_TEMP}/${NAME}.pass" ] && echo "NAME.pass DOES exist... |$$|$(cat "${DIR_TEMP}/${NAME}.pid")|"
+( [ -e "${DIR_TEMP}/${NAME}.pass" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] ) && echo 'there was a failed prior attempt...'
+
+	# if there are no passes (or no passes have been made yet (e.g. this is the initial invocation)) -OR- the multi-pass file exists -AND- the script pid doesn't equal the recorded one, then...
+	if [ ! -e "${DIR_TEMP}/${NAME}.pass" ] || ( [ -e "${DIR_TEMP}/${NAME}.pass" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] ); then
+[ "$2" ] && echo "a file was passed |$2|"
+echo "checking for |${DIR_PROF}/${NAME}/${2}.1|"
+[ -e "${DIR_PROF}/${NAME}/${2}.1" ] && echo 'yup!' || echo 'nope...'
+		[ "$2" ] && [ -e "${DIR_PROF}/${NAME}/${2}.1" ] && {				#   if a FILE was passed -AND- the file exists, then...
 echo 'pass() init'
 			[ "$2" = 'config' ] && TEMP='INIT'					#      indicate we are doing a multi-pass
-			[ "$2" = 'params' ] && TEMP="$PASS"					#      indicate we are doing a multi-pass
+			[ "$2" = 'params' ] && TEMP="$PASS"					#      indicate we are doing a multi-pass		NOTE: the PASS value would be set by this function already being run when 'config' was processed beforehand
 			PASS=1									#      set the variable to an initial value so the params.1 file can be processed
 			return
 		}
 
 echo 'pass() exit'
-return						# if no params.* files exist, nor does a NAME.pass, then this isn't a multi-pass profile so we can exit
-	}
+return						# if no FILE exist, nor a NAME.pass, then this isn't a multi-pass profile so we can exit
+	fi
 echo 'pass() process'
 	PASS="$(cat "${DIR_TEMP}/${NAME}.pass")"
 	TEMP=${PASS%|*}										#   store the total passes required
@@ -329,7 +338,7 @@ package() {
 			NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
 			mv "$NAME" "$NAMES" 2>>"$LOG"
 		}
-		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP")"					# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | grep ^"${NAME}")"			# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 
 		for DIR in $NAMES; do
 			# strip the debug symbols from the just-compiled software		  https://superuser.com/questions/236601/how-do-i-execute-multiple-commands-when-using-find
@@ -359,7 +368,7 @@ package() {
 			NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
 			mv "$NAME" "$NAMES" 2>>"$LOG"
 		}
-		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP")"					# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | grep ^"${NAME}")"			# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 
 		echo -e "\nSeparating into various packages..." | tee -a "$LOG"
 		for DIR in $NAMES; do
@@ -552,7 +561,7 @@ echo 'oops! packaging'
 # LOAD PROFILE CONFIGURATION
 
 eval "NAME=\${$#}"										# store the current last passed value (which should be the NAME)
-echo "@ |$@|"
+	echo "@ |$@|"
 if ( ! echo "$@" | grep -q '\-u ' ); then							# if we're not uninstalling a profile, then...
 echo 'uninstall was NOT passed'
 	TEMP=''
@@ -1150,7 +1159,7 @@ elif [ "$TEMPLATE" ]; then
 		}
 		cd "${DIR_TEMP}/${NAME}/include" >/dev/null
 		echo "Calling: mkdir -p \"${DIR_TEMP}/${NAME}\"" >>"$LOG"
-		mkdir -p DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC >>"$LOG" 2>&1 || {
+		mkdir -p DIR_BIN DIR_DEVMAN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC >>"$LOG" 2>&1 || {
 			echo "ERROR: The profile directory (DIR_TEMP) does not exist or could not be created." >>"$LOG"
 			stop failed
 		}
@@ -1161,6 +1170,7 @@ elif [ "$TEMPLATE" ]; then
 		echo >>"README.txt"
 		echo "Directory Installation Locations:" >>"README.txt"
 		echo "DIR_BIN		LSB: /bin" >>"README.txt"
+		echo "DIR_DEVMAN	LSB: /etc/udev/rules.d" >>"README.txt"
 		echo "DIR_ETC		LSB: /etc" >>"README.txt"
 		echo "DIR_LIB		LSB: /lib" >>"README.txt"
 		echo "DIR_SBIN		LSB: /sbin		XSB: /bin" >>"README.txt"
@@ -1286,6 +1296,7 @@ elif [ "$TEMPLATE" ]; then
 		echo >>config
 		echo "# Uncomment any of the directory installation locations you wish to modify" >>config
 		echo "#DIR_BIN=\"\${DIR_INST}/bin\"" >>config
+		echo "#DIR_DEVMAN='/etc/udev/rules.d'" >>config
 		echo "#DIR_ETC=\"\${DIR_INST}/etc\"" >>config
 		echo "#DIR_LIB=\"\${DIR_INST}/lib\"" >>config
 		echo "#DIR_SBIN=\"\${DIR_INST}/sbin\"" >>config
@@ -1755,7 +1766,7 @@ echo -e "\nGenerating the compile script..." | tee -a "$LOG"
 echo "#!/bin/sh" >"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset DIR_CONF DIR_DUMP DIR_INST DIR_PROF DIR_REPO DIR_TEMP' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"						# unset these variables set at the top of this script to not pollute the compile environment
-echo 'unset DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
+echo 'unset DIR_BIN DIR_DEVMAN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset DEP_MAKE_ALL' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset EXT_BLDR EXT_CODE EXT_DEPS EXT_HASH EXT_INFO EXT_LIST EXT_MAKE EXT_SOFT' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset OWN_USER OWN_GROUP' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
@@ -1845,7 +1856,7 @@ echo -e "\nCompiling the software..." | tee -a "$LOG"
 
 echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
 TEMP=''
-for DIR in DIR_BIN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
+for DIR in DIR_BIN DIR_DEVMAN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
 	# skip the processing of the directory if either of these two conditions are met
 	( [ "$(eval "echo \$$DIR")" = '' ] || [ "$DIR" = 'CFG_MISC' ] ) && continue
 	[ ! -e "${DIR_PROF}/${NAME}/include/${DIR}" ] && [ ! -e "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}" ] && continue
@@ -1877,7 +1888,13 @@ done
 
 if [ "$BUILD" = 'package' ]; then								# if we are packaging, then call those routines
 	package
-	[ "$PASS" ] && [ "$DEPS" ] && { eval "$SPM_DEPS" || stop failed; }			# if we're doing multi-pass -AND- this package is a dependency for a future pass, then we need to install it now!
+	[ "$PASS" ] && [ "$DEPS" ] && {								# if we're doing multi-pass -AND- this package is a dependency for a future pass, then we need to install it now!
+		eval "DEPS=\"$DEPS\""
+
+		echo -e "\nInstalling \"${DEPS}\" as a dependency for next pass..." | tee -a "$LOG"
+
+		eval "$SPM_DEPS" || stop failed;
+	}
 
 # LEFT OFF - we need to adjust the below PASS conditions so something like the above can take place
 elif [ "$BUILD" = 'install' ]; then								# otherwise we are doing a compile-only and need to install (if this is the only/last pass)
@@ -1937,6 +1954,7 @@ fi
 # passed D P F T lib U alsa
 # LEFT OFF - if any of these are in the 'params' or 'params.*' files, then do NOT include them below!
 
+
 	TEMP="$THIS -A $ARCH"									# since this value can NOT change, add it in no matter what
 	#[ "$PASS" ] && TEMP="$TEMP -N $PASS"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
 	( ! grep -q ^'METHOD=' "${DIR_PROF}/${NAME}/params"* ) && TEMP="$TEMP -M $METHOD"	# if this parameter is NOT in any of the param files, then it was either the default value -or- passed via command line, so we need to keep that value
@@ -1954,7 +1972,8 @@ fi
 #
 #	eval "$TEMP \"$NAME\""
 #	exit 0
-echo "execing |$TEMP|"
+echo -n "execing |$TEMP| press any key to continue... "
+read
 	exec $TEMP						# re-launch builder using the adjusted parameters
 }								# NOTE: exec will replace this invocation of the script with the above line	https://stackoverflow.com/questions/18351198/what-are-the-uses-of-the-exec-command-in-shell-scripts
 

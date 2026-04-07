@@ -303,3 +303,10 @@
 - Updated stop() to delete appropriate data
 - Updated the man page
 
+2026/04/07
+- Updated the alsa profile (multiple times)
+- Added DIR_DEVMAN variable
+- Updated pass() to add more checks
+- Updated package() to parse better
+- Updated the dependency install to be more verbose and eval DEPS beforehand
+
