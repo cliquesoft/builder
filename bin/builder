@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/07 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/08 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -62,8 +62,12 @@ export URL_INFO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}/${NAME}${EXT_INF
 export URL_REPO='http://repo.cliquesoft.org/vanilla/1.1/${NAME}'				# the distro repo URL used to obtain the package source code and builder profiles (set in builder config file)
 
 export SPM_ALL='$SUDO pax -L none -i $DEP_MAKE_ALL'		# the software package manager command to install compile-time dependencies (overall)
-export SPM_PACK='$SUDO pax -L none -i $DEP_MAKE_PAK'		# the software package manager command to install compile-time dependencies (package specific)
-export SPM_DEPS='$SUDO pax -L none -S $DIR_REPO -i $DEPS'	# the software package manager command to install the built package if it's a dependency for a future pass (e.g. alsa-libs)
+# DBUG
+#export SPM_PACK='$SUDO pax -L none -i $DEP_MAKE_PAK'		# the software package manager command to install compile-time dependencies (package specific)
+export SPM_PACK='$SUDO pax -L none -P -i $DEP_MAKE_PAK'		# the software package manager command to install compile-time dependencies (package specific)
+# DBUG
+#export SPM_DEPS='$SUDO pax -L none -S $DIR_REPO -i $DEPS'	# the software package manager command to install the built package if it's a dependency for a future pass (e.g. alsa-libs)
+export SPM_DEPS='$SUDO pax -L none -P -S $DIR_REPO -i $DEPS'	# the software package manager command to install the built package if it's a dependency for a future pass (e.g. alsa-libs)
 export SPM_MAKE='$SUDO pax -S ${DIR_DUMP}/${NAME}.${TYPE} -m ${PACKAGE} ${DIR_DUMP}'		# the software package manager command to make a package from the compiled software by this script
 export SPM_UNLD='$SUDO pax -u unload $DEP_MAKE_PAK'		# the software package manager command to unload compile-time dependencies (to keep the environment clean)
 
@@ -163,15 +167,9 @@ export URL_CODE=''						# the developer URL used to obtain the package source co
 
 export CUSTOM=''						# used when METHOD='custom'
 
-export DIR_BIN="${DIR_INST}/bin"				# software installation directory locations
 export DIR_DEVMAN="/etc/udev/rules.d"				# location for device manager files
-export DIR_ETC="${DIR_INST}/etc"
-export DIR_LIB="${DIR_INST}/lib"
-export DIR_SBIN="${DIR_INST}/bin"
-export DIR_SHARE="${DIR_INST}/share"
-export DIR_VAR="${DIR_INST}/var"
-export DIR_MARKERS="${DIR_INST}/${DIR_VAR}/cache/software"
-export DIR_SCRIPTS="${DIR_INST}/etc/init.d"
+export DIR_MARKERS="${DIR_INST}/var/cache/software"		# location for package markers
+export DIR_SCRIPTS="${DIR_INST}/etc/init.d"			# location for package start/stop scripts
 
 export CFG_BIN="${DIR_INST}/bin"				# compile 'configure' directory locations
 export CFG_DATA="${DIR_INST}/var/share"
@@ -440,7 +438,9 @@ package() {
 				find ".${CFG_LIB}/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null		# update the permissions of all the libraries
 				find ".${CFG_LIB}64/" \( -not -type d -a -not -name \*.a \) -exec chmod $PRM_EXECS {} \; 2>/dev/null
 				find ".${CFG_LIBEXEC}/" -not -type d -exec chmod $PRM_EXECS {} \; 2>/dev/null					# update the permissions of lib executables		https://www.redhat.com/archives/rpm-list/2004-February/msg00027.html  https://unix.stackexchange.com/questions/74646/difference-between-lib-lib32-lib64-libx32-and-libexec
-				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null			# update these directory contents to be executable
+# UPDATED 2026/04/08
+#				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null			# update these directory contents to be executable
+				chmod $PRM_EXECS ${CFG_BIN}/* ${CFG_SBIN}/* 2>/dev/null								# update these directory contents to be executable
 				eval "$SUDO chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>\"$LOG\" 2>&1"						# update the ownership of all the package contents
 			done
 		done
@@ -516,6 +516,17 @@ echo 'oops! packaging'
 			}
 			echo "   ${NAME} [${TYPE}]"
 			echo -e "\n\n   ----- ${NAME} ${TYPE} -----\n\n" >>"$LOG"
+# TESTING - copy in any marker files
+echo "markers |${DIR_PROF}/${NAME}/include.${PASS}/DIR_MARKERS/${PACKAGE}|${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}|"
+	[ "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/include.${PASS}/DIR_MARKERS/${PACKAGE}" ] && {
+		[ ! -d "${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}" ] && mkdir -p "${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}" >/dev/null 2>>"$LOG"
+		cp -dpR "${DIR_PROF}/${NAME}/include.${PASS}/DIR_MARKERS/${PACKAGE}" "${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}" 2>>"$LOG"
+	}
+	[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/include/DIR_MARKERS/${PACKAGE}" ] && {
+		[ ! -d "${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}" ] && mkdir -p "${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}" >/dev/null 2>>"$LOG"
+		cp -dpR "${DIR_PROF}/${NAME}/include/DIR_MARKERS/${PACKAGE}" "${DIR_DUMP}/${NAME}.${TYPE}${DIR_MARKERS}" 2>>"$LOG"
+	}
+
 			[ "$SPM_MAKE" ] && { eval "$SPM_MAKE" || stop failed; }			# NOTE: we use a variable so any package manager can create a native package for their distro
 
 			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
@@ -684,9 +695,9 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	  - the files here need manual placement if they will be used"
 	echo "	include [directory]"
 	echo "	  contains items like .desktop files, icons, install markers/scripts,"
-	echo "	  service scripts, etc. (e.g. include/DIR_ETC/php/php.conf)"
+	echo "	  service scripts, etc. (e.g. include/CFG_SYSCONFIG/php/php.conf)"
 	echo "	  NOTES:"
-	echo "	  - do NOT rename the subdirectories (e.g. DIR_ETC)!"
+	echo "	  - do NOT rename the subdirectories (e.g. CFG_SYSCONFIG)!"
 	echo "	  - the files in these directories get installed automatically"
 	echo "	patches [directory]"
 	echo "	  list of patches to apply to the codebase; they are applied in the"
@@ -709,7 +720,7 @@ if [ "$1" = '' ] || [ "$1" = '--help' ]; then
 	echo "	      cleanup		executed as last command before exiting"
 	echo "	- For multi-pass compiles, name the files in a mannor such as:"
 	echo "	      pre.compile.1, pre.compile.2, config.1, config.2, etc"
-	echo "	      (also apply to the 'include' directory - include.1/DIR_ETC)"
+	echo "	      (also apply to the 'include' directory - include.1/CFG_SYSCONFIG)"
 	echo
 	echo "  Notes:"
 	echo "	- Unless the '-C' switch was passed, with an accompanying config file"
@@ -1159,7 +1170,7 @@ elif [ "$TEMPLATE" ]; then
 		}
 		cd "${DIR_TEMP}/${NAME}/include" >/dev/null
 		echo "Calling: mkdir -p \"${DIR_TEMP}/${NAME}\"" >>"$LOG"
-		mkdir -p DIR_BIN DIR_DEVMAN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC >>"$LOG" 2>&1 || {
+		mkdir -p DIR_DEVMAN DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC >>"$LOG" 2>&1 || {
 			echo "ERROR: The profile directory (DIR_TEMP) does not exist or could not be created." >>"$LOG"
 			stop failed
 		}
@@ -1169,17 +1180,11 @@ elif [ "$TEMPLATE" ]; then
 		echo "- This file can be deleted." >>"README.txt"
 		echo >>"README.txt"
 		echo "Directory Installation Locations:" >>"README.txt"
-		echo "DIR_BIN		LSB: /bin" >>"README.txt"
 		echo "DIR_DEVMAN	LSB: /etc/udev/rules.d" >>"README.txt"
-		echo "DIR_ETC		LSB: /etc" >>"README.txt"
-		echo "DIR_LIB		LSB: /lib" >>"README.txt"
-		echo "DIR_SBIN		LSB: /sbin		XSB: /bin" >>"README.txt"
-		echo "DIR_SHARE		LSB: /usr/share		XSB: /var/share" >>"README.txt"
-		echo "DIR_VAR		LSB: /var" >>"README.txt"
 		echo "DIR_MARKERS	LSB: -			XSB: /var/cache/software" >>"README.txt"
 		echo "DIR_SCRIPTS	LSB: /etc/init.d" >>"README.txt"
 		echo >>"README.txt"
-		echo "Compile 'configure' Directory Locations:" >>"README.txt"
+		echo "Compile 'configure' and Installation Directory Locations:" >>"README.txt"
 		echo "CFG_BIN		LSB: DIR_INST/bin" >>"README.txt"
 		echo "CFG_DATA		LSB: DIR_INST/share	XSB: DIR_INST/var/share" >>"README.txt"
 		echo "CFG_DATAROOT	LSB: CFG_DATA" >>"README.txt"
@@ -1295,14 +1300,8 @@ elif [ "$TEMPLATE" ]; then
 		echo "#DIR_INST='/usr/local'" >>config
 		echo >>config
 		echo "# Uncomment any of the directory installation locations you wish to modify" >>config
-		echo "#DIR_BIN=\"\${DIR_INST}/bin\"" >>config
 		echo "#DIR_DEVMAN='/etc/udev/rules.d'" >>config
-		echo "#DIR_ETC=\"\${DIR_INST}/etc\"" >>config
-		echo "#DIR_LIB=\"\${DIR_INST}/lib\"" >>config
-		echo "#DIR_SBIN=\"\${DIR_INST}/sbin\"" >>config
-		echo "#DIR_SHARE=\"\${DIR_INST}/share\"" >>config
-		echo "#DIR_VAR=\"\${DIR_INST}/var\"" >>config
-		echo "#DIR_MARKERS=\"\${DIR_INST}/usr/local/installed\"" >>config
+		echo "#DIR_MARKERS=\"\${DIR_INST}/installed\"" >>config
 		echo "#DIR_SCRIPTS=\"\${DIR_INST}/etc/init.d\"" >>config
 		echo >>config
 		echo "# Uncomment any of the directory configuration locations you wish to modify" >>config
@@ -1766,7 +1765,7 @@ echo -e "\nGenerating the compile script..." | tee -a "$LOG"
 echo "#!/bin/sh" >"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset DIR_CONF DIR_DUMP DIR_INST DIR_PROF DIR_REPO DIR_TEMP' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"						# unset these variables set at the top of this script to not pollute the compile environment
-echo 'unset DIR_BIN DIR_DEVMAN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
+echo 'unset DIR_DEVMAN DIR_MARKERS DIR_SCRIPTS' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset DEP_MAKE_ALL' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset EXT_BLDR EXT_CODE EXT_DEPS EXT_HASH EXT_INFO EXT_LIST EXT_MAKE EXT_SOFT' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo 'unset OWN_USER OWN_GROUP' >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
@@ -1856,14 +1855,17 @@ echo -e "\nCompiling the software..." | tee -a "$LOG"
 
 echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
 TEMP=''
-for DIR in DIR_BIN DIR_DEVMAN DIR_ETC DIR_LIB DIR_SBIN DIR_SHARE DIR_VAR DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
+for DIR in DIR_DEVMAN DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
 	# skip the processing of the directory if either of these two conditions are met
 	( [ "$(eval "echo \$$DIR")" = '' ] || [ "$DIR" = 'CFG_MISC' ] ) && continue
 	[ ! -e "${DIR_PROF}/${NAME}/include/${DIR}" ] && [ ! -e "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}" ] && continue
 
 	mkdir -p "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
+# TESTING
+  if [ "$DIR" != 'DIR_MARKERS' ]; then
 	[ "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
 	[ ! "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
+  fi
 done
 
 [ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.compile" ] && {											# execute any existing post-compile script (for single-pass; multi-pass is next line)

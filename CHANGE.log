@@ -310,3 +310,19 @@
 - Updated package() to parse better
 - Updated the dependency install to be more verbose and eval DEPS beforehand
 
+2026/04/08
+- Updated the alsa profile (multiple times)
+- Replaced the DIR_ directory installation variables with the CFG_ equivalents
+- Updated the processing of DIR_MARKERS to be per package, not in general
+- Updated the sample config files
+- Updated the man page
+
+
+
+
+- may have to update the source and builder profile to the newer vesion of alsa since it won't compile
+- test burn still builds correctly
+- test alsa builds individually and together
+- Tested with TinyCore Linux
+
+

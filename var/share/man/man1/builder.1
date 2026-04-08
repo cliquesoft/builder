@@ -375,30 +375,19 @@ Each of these variables can also be defined in the global config as the
 default values used, with the ones in this file being specific instances
 where deviation is required. It is important to note that these values
 should include the DIR_INST variable so that any desired directory prefix
-can be applied to the installation path (e.g. /usr/local)
+can be applied to the installation path (e.g. /usr/local). You may notice
+that some variables begin with DIR_ while others begin with CFG_. The two
+differenciate only in that the CFG_ variables are passed to the configure
+script during compilation, whereas the DIR_ are used in other places. Both
+however, can be used at any time.
 
 .B DIR_INST
 If this value is different than the default, which is usually root (/),
 then you can specify an alternate directory where the package contents
 will reside in the running system (typicall '/usr/local')
 
-.B DIR_BIN
-The directory used to store general use binaries
-
-.B DIR_ETC
-The directory used to store software configurations
-
-.B DIR_LIB
-The directory used to store common use libraries
-
-.B DIR_SBIN
-The directory used to store elevated privileged binaries
-
-.B DIR_SHARE
-The directory used to store common use files
-
-.B DIR_VAR
-The directory used to store variable data files
+.B DIR_DEVMAN
+The directory used to store device manager rules/scripts
 
 .B DIR_MARKERS
 The directory used to store installed package (cache) data
@@ -408,61 +397,61 @@ The directory used to store service start/stop scripts
 
 
 .B CFG_BIN="${DIR_INST}/bin"
-The configure scripts directory location for general use binaries
+The directory location for general use binaries
 
 .B CFG_DATA="${DIR_INST}/share"
-The configure scripts directory location for common use files
+The directory location for common use files
 
 .B CFG_DATAROOT="${CFG_DATA}"
-The configure scripts directory location for common use files
+The directory location for common use files
 
 .B CFG_DOC="${CFG_DATA}/doc/${NAME}"
-The configure scripts directory location for documentation files
+The directory location for documentation files
 
 .B CFG_DVI="${CFG_DOC}"
-The configure scripts directory location for print related files
+The directory location for print related files
 
 .B CFG_HTML="${CFG_DOC}"
-The configure scripts directory location for HTML-based doc files
+The directory location for HTML-based doc files
 
 .B CFG_INCLUDE="${DIR_INST}/include"
-The configure scripts directory location for compiling header files
+The directory location for compiling header files
 
 .B CFG_INFO="${CFG_DATA}/info"
-The configure scripts directory location for documentation files
+The directory location for documentation files
 
 .B CFG_LIB="${DIR_INST}/lib"
-The configure scripts directory location for common use libraries
+The directory location for common use libraries
 
 .B CFG_LIBEXEC="${DIR_INST}/libexec"
-The configure scripts directory location for executable libraries
+The directory location for executable libraries
 
 .B CFG_LOCALE="${CFG_DATA}/locale"
-The configure scripts directory location for region specific files
+The directory location for region specific files
 
 .B CFG_LOCALSTATE="${DIR_INST}/var"
-The configure scripts directory location for variable data files
+The directory location for variable data files
 
 .B CFG_MAN="${CFG_DATA}/man"
-The configure scripts directory location for documentation files
+The directory location for documentation files
 
 .B CFG_OLDINCLUDE="${DIR_INST}/include"
-The configure scripts directory location for compiling header files
+The directory location for compiling header files
 
 .B CFG_PDF="${CFG_DOC}"
-The configure scripts directory location for documentation files
+The directory location for documentation files
 
 .B CFG_PS="${CFG_DOC}"
-The configure scripts directory location for documentation files
+The directory location for documentation files
 
 .B CFG_SBIN="${DIR_INST}/sbin"
-The configure scripts directory location for elevated privileged binaries
+The directory location for elevated privileged binaries
 
 .B CFG_SHAREDSTATE="${DIR_INST}/com"
-The configure scripts directory location for shared state files
+The directory location for shared state files
 
 .B CFG_SYSCONFIG="${DIR_INST}/etc"
-The configure scripts directory location for software configurations
+The directory location for software configurations
 
 .B CFG_MISC
 This variable is unique to the builder profile config only, NOT the global
