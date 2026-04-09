@@ -317,6 +317,11 @@
 - Updated the sample config files
 - Updated the man page
 
+2026/04/09
+- Updated alsa source code for testing to 1.2.13
+- Updated the alsa profile (multiple times)
+- Updated the decompression for bzip2 to use tar instead of calling bunzip2
+
 
 
 
@@ -325,4 +330,8 @@
 - test alsa builds individually and together
 - Tested with TinyCore Linux
 
+automated updated checking (via .info file):
+Update: list (hashes the listing [like alsa] so when the hash changes, a trigger can prompt an alert)
+	link (checks a URL for a download link [e.g. the latest stable] value, triggering a prompt when changed)
+Check: the hash if 'list' is used, the <a> filename if 'link' is used
 

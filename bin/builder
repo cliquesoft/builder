@@ -22,6 +22,8 @@
 #	gir	GObject
 # 	lib	libraries
 # 	loc	locales
+#	msc	miscellaneous
+#	plg	plugins
 #	src	source
 # - List 'cmake' options https://stackoverflow.com/questions/16851084/how-to-list-all-cmake-build-options-and-their-default-values
 
@@ -1629,8 +1631,10 @@ if [ "$SOURCE" ]; then										# if we need to obtain the source code before we
 			'application/zip') unzip "$TEMP" 2>>"$LOG" ;;
 			'application/gzip'|'application/x-gzip') tar -xzf "$TEMP" 2>>"$LOG" ;;
 			'application/bzip2'|'application/x-bzip2')
-				[ ! -e "${TEMP%.*}" ] && bunzip2 "$TEMP" 2>>"$LOG"		#    if the file is already uncompressed, then do so now
-				tar -xf "${TEMP%.*}" 2>>"$LOG"
+# UPDATED 2026/04/09
+#				[ ! -e "${TEMP%.*}" ] && bunzip2 "$TEMP" 2>>"$LOG"		#    if the file is already uncompressed, then do so now
+#				tar -xjf "${TEMP%.*}" 2>>"$LOG"
+tar -xjf "$TEMP" 2>>"$LOG"
 				;;
 		esac
 		[ "$SOURCE" = 'git2' ] && SOURCE='git'						#    if the value had been temporarily changed above, we now need to change it back
