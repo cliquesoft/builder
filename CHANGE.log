@@ -322,10 +322,15 @@
 - Updated the alsa profile (multiple times)
 - Updated the decompression for bzip2 to use tar instead of calling bunzip2
 
+2026/04/14
+- Added 'cfg,msc,plg' values to the -T option
+- Updated the alsa profile to include alsa-ucm-conf and alsa-plugins
+- Updated the config files
+- Updated conditions for calling 'make'
 
 
 
-- may have to update the source and builder profile to the newer vesion of alsa since it won't compile
+
 - test burn still builds correctly
 - test alsa builds individually and together
 - Tested with TinyCore Linux
@@ -334,4 +339,7 @@ automated updated checking (via .info file):
 Update: list (hashes the listing [like alsa] so when the hash changes, a trigger can prompt an alert)
 	link (checks a URL for a download link [e.g. the latest stable] value, triggering a prompt when changed)
 Check: the hash if 'list' is used, the <a> filename if 'link' is used
+
+The '-C dev' does not work for alsa
+cycle the profile if a user wants to build a particular type (e.g. only alsa-lib)
 

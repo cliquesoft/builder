@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/08 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/14 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -16,6 +16,7 @@
 # - Call this script from inside the directory containing the source code
 # - The types of packages produced:
 # 	bin	binaries
+#	cfg	configuration
 # 	dev	development
 # 	doc	documentation
 #	drv	drivers
@@ -331,7 +332,7 @@ package() {
 	# PRE-PACKAGE SORTING
 
 	TEMP=''
-	if [ "$SINGLE" ] && ( [ "$SORT" ] || [ ! "$PASS" ] ); then				# if we do NOT need separate packages -AND- (were instructed to sort on this pass -OR- there is only one pass), then...
+	if [ "$SINGLE" ] && ( [ "$SORT" ] || [ ! "$PASS" ] ); then				# if we do NOT need to separate packages -AND- (were instructed to sort on this pass -OR- there is only one pass), then...
 		# store the package names that need to be processed (either NAME or directory names)
 		[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"					# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
 		[ ! "$DIRS" ] && [ "$TRIM" ] && {						# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
@@ -378,12 +379,15 @@ package() {
 			find . -type f -executable \( -not -name \*.la -a -not -name \*.a \) -exec /bin/sh -c 'file -b --mime-type {} | grep -q application && strip --strip-unneeded {}' \;
 
 			# create all the directories to split the package contents into
+			[ ! -d "${DIR}.cfg" ] && mkdir "${DIR}.cfg" 2>>"$LOG"
 			[ ! -d "${DIR}.dev" ] && mkdir "${DIR}.dev" 2>>"$LOG"
 			[ ! -d "${DIR}.doc" ] && mkdir "${DIR}.doc" 2>>"$LOG"
 			[ ! -d "${DIR}.drv" ] && mkdir "${DIR}.drv" 2>>"$LOG"
 			[ ! -d "${DIR}.gir" ] && mkdir "${DIR}.gir" 2>>"$LOG"
 			[ ! -d "${DIR}.lib" ] && mkdir "${DIR}.lib" 2>>"$LOG"
 			[ ! -d "${DIR}.loc" ] && mkdir "${DIR}.loc" 2>>"$LOG"
+			[ ! -d "${DIR}.msc" ] && mkdir "${DIR}.msc" 2>>"$LOG"
+			[ ! -d "${DIR}.plg" ] && mkdir "${DIR}.plg" 2>>"$LOG"
 
 			# split the package contents into bin, doc, dev, lib, ...
 			# https://unix.stackexchange.com/questions/154818/how-to-integrate-mv-command-after-find-command
@@ -411,7 +415,7 @@ package() {
 			[ -e "$DIR" ] && mv "$DIR" "${DIR}.bin"					# adjust the name so it can be included in the 'for' loop below		NOTE: test first incase the package only contains libs (which will erase this directory on the line above)
 		done
 
-		TEMP='bin dev doc drv gir lib loc'						# store all the directories the files were separated into
+		TEMP='bin cfg dev doc drv gir lib loc msc plg'					# store all the directories the files were separated into
 	fi
 
 	# NOTE: we should only apply ownership and permissions on the final pass (or if the package is a dependency for an upcoming multi-pass package)!!!
@@ -788,7 +792,7 @@ else
 				exit 1
 			   }
 			   TEMPLATE="$OPTARG" ;;
-			T) ( echo "${OPTARG}" | grep -qE ^'(bin|dev|doc|drv|gir|lib|loc)' ) || {
+			T) ( echo "${OPTARG}" | grep -qE ^'(bin|cfg|dev|doc|drv|gir|lib|loc|msc|plg)' ) || {
 				showMsg 'failure' "ERROR: An invalid value for '-T' was passed." 'screen'
 				exit 1
 			   }
@@ -1826,7 +1830,7 @@ elif [ "$METHOD" = 'cmake' ]; then
 	echo "cd build_me >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 	echo "cmake $FLAG_CONF .. >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 elif [ "$METHOD" = 'custom' ]; then
-	eval "echo \"$CUSTOM >>\\\"$LOG\\\" 2>&1 || exit 1\" >>\"${DIR_TEMP}/${NAME}${EXT_MAKE}\""
+	eval "echo -e \"$CUSTOM >>\\\"$LOG\\\" 2>&1 || exit 1\" >>\"${DIR_TEMP}/${NAME}${EXT_MAKE}\""
 elif [ "$METHOD" = 'default' ]; then
 	[ $CONF -eq 1 ] && { echo "./configure$TEMP $FLAG_CONF >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"; }
 elif [ "$METHOD" = 'scons' ]; then
@@ -1844,7 +1848,7 @@ fi
 	echo "echo -e \"   Proceeding with next steps of compile...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 }
 
-if [ "$METHOD" != 'scons' ]; then
+if [ "$METHOD" != 'scons' ] && [ "$METHOD" != 'custom' ]; then
 	echo "make $FLAG_MAKE >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"							# NOTE: 'nice' should help prevent non-responding system crashes, and '-j' indicates to use all cores of a CPU during compiling
 	[ $CHECK -eq 1 ] && echo "make check >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 	[ $TEST -eq 1 ] && echo "make test >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
