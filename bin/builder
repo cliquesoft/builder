@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/14 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/16 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -370,7 +370,7 @@ package() {
 			mv "$NAME" "$NAMES" 2>>"$LOG"
 		}
 		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | grep ^"${NAME}")"			# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
-
+												# (this is useful for a single package that gets turned into multiple like php > php-cgi, php-dev, php-ext, php-fpm, ...)
 		echo -e "\nSeparating into various packages..." | tee -a "$LOG"
 		for DIR in $NAMES; do
 			[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$DIR\"" | tee -a "$LOG"
@@ -462,10 +462,13 @@ package() {
 
 	# CREATE EACH PACKAGE
 echo "skip pass|$SKIP|$PASS|$(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//')"
+[ ! "$SKIP" ] && echo 'not SKIP'
+[ "$PASS" ] && echo 'we have a PASS'
+[ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && echo 'PASS is lt the total pass count'
 # default value is SKIP=TRUE
-	[ ! "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && {
+	[ "$SKIP" ] && [ "$PASS" ] && [ $PASS -lt $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] && {
 echo 'skipping packaging since were not on the last pass yet...'
-		[ $DEBUG -gt 0 ] && echo "   DEBUG: The -F and -N were passed, but we're not on the last pass."
+		[ $DEBUG -gt 0 ] && echo "   DEBUG: A -N was passed (-F wasn't), and we're not on the last pass."
 		return 0									# if '-F' was passed -AND- '-N' was passed -AND- we are on the last pass, then exit this function
 	}
 echo 'oops! packaging'
@@ -986,9 +989,10 @@ if [ ! "$PASS" ] || [ $PASS -eq 1 ]; then
 	echo "           $(date +'%Y-%m-%d  %H:%M:%S')" >>"$LOG"
 	echo >>"$LOG"
 	echo "$EXE_CMD" >>"$LOG"
-elif [ "$PASS" ]; then
-	echo -e "\n\n\n\n" >>"$LOG"				# add some breaks between builds if the log already exists
-	echo "------- PASS: ${PASS}  $(date +'%Y-%m-%d %H:%M:%S') -------" >>"$LOG"
+# MOVED 2026/04/16
+#elif [ "$PASS" ]; then
+#	echo -e "\n\n\n\n" >>"$LOG"				# add some breaks between builds if the log already exists
+#	echo "------- PASS: ${PASS}  $(date +'%Y-%m-%d %H:%M:%S') -------" >>"$LOG"
 fi
 
 
@@ -1445,7 +1449,7 @@ fi
 # if we're doing a single pass -or- on the first pass of a multi-pass -AND- any of these files/directories exist, then...
 # NOTE: we check for .pid since that get generated no matter if single or multi-pass
 #if ( [ ! "$PASS" ] || [ $PASS -eq 1 ] ) && ( [ -e "${DIR_TEMP}/${NAME}.pid" ] || [ -d "${DIR_DUMP}/${NAME}.bin" ] || ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) ); then
-if ( [ ! "$PASS" ] || [ $$ -ne "$(cat ${DIR_TEMP}/${NAME}.pid)" ] ) && ( [ -d "${DIR_DUMP}/${NAME}.bin" ] || ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) ); then
+if ( [ ! "$PASS" ] || [ $$ -ne "$(cat ${DIR_TEMP}/${NAME}.pid)" ] ) && ( [ -d "${DIR_DUMP}/${NAME}.bin" ] || ( ls -1 "${DIR_DUMP}/${NAME}" | grep -q . ) || ( ls -1 "${DIR_TEMP}/${NAME}" | grep -q . ) ); then
 	echo -n "It appears a prior (attempted) compile has left files, cleanup? [Y/N/Q] (N): "
 	read
 	[ "$REPLY" = 'Q' ] || [ "$REPLY" = 'q' ] && stop					# NOTE: the script does NOT stop here if 'yes' was requested
@@ -1475,6 +1479,14 @@ echo "$$" >"${DIR_TEMP}/${NAME}.pid"				# used to indicate if we're on successfu
 	echo "${PASS}|1" >"${DIR_TEMP}/${NAME}.pass"		#   stored value in format of: TOTAL|CURRENT
 	PASS=1							#   now store the value that we are working on the first pass
 }
+
+
+
+
+if [ "$PASS" ]; then
+	echo -e "\n\n\n\n" >>"$LOG"				# add some breaks between builds if the log already exists
+	echo "------- PASS: ${PASS}  $(date +'%Y-%m-%d %H:%M:%S') -------" >>"$LOG"
+fi
 
 
 
@@ -1702,7 +1714,7 @@ fi
 
 # APPLY ANY PATCHES
 
-if [ "$PATCH" ]; then
+if [ "$PATCH" ] && ( [ -d "${DIR_PROF}/${NAME}/patches" ] || [ -d "${DIR_PROF}/${NAME}/patches.${PASS}" ] ); then
 	echo -e "\nApplying software patches..." | tee -a "$LOG"
 
 	OLDIFS="$IFS"
@@ -1766,6 +1778,7 @@ fi
 	echo -e "\nExecuting the 'pre.compile' script..." | tee -a "$LOG"
 	"${DIR_PROF}/${NAME}/pre.compile.${PASS}" 2>>"$LOG" || stop failed
 }
+
 
 eval "EXT_MAKE=\"$EXT_MAKE\""
 
@@ -1837,6 +1850,7 @@ elif [ "$METHOD" = 'scons' ]; then
 	echo "scons $FLAG_CONF >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 fi
 
+
 [ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.configure" ] && {										# execute any existing post-configure script (for single-pass; multi-pass is next block)
 	echo "echo -e \"   Executing the 'post.configure' script...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 	echo "${DIR_PROF}/${NAME}/post.configure >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
@@ -1848,6 +1862,7 @@ fi
 	echo "echo -e \"   Proceeding with next steps of compile...\" | tee -a \"$LOG\"" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
 }
 
+
 if [ "$METHOD" != 'scons' ] && [ "$METHOD" != 'custom' ]; then
 	echo "make $FLAG_MAKE >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"							# NOTE: 'nice' should help prevent non-responding system crashes, and '-j' indicates to use all cores of a CPU during compiling
 	[ $CHECK -eq 1 ] && echo "make check >>\"$LOG\" 2>&1 || exit 1" >>"${DIR_TEMP}/${NAME}${EXT_MAKE}"
@@ -1858,23 +1873,28 @@ elif [ "$METHOD" = 'scons' ]; then
 fi
 chmod 775 "${DIR_TEMP}/${NAME}${EXT_MAKE}"
 
+
 echo -e "\nCompiling the software..." | tee -a "$LOG"
 "${DIR_TEMP}/${NAME}${EXT_MAKE}" || stop failed
 
-echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
-TEMP=''
-for DIR in DIR_DEVMAN DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
-	# skip the processing of the directory if either of these two conditions are met
-	( [ "$(eval "echo \$$DIR")" = '' ] || [ "$DIR" = 'CFG_MISC' ] ) && continue
-	[ ! -e "${DIR_PROF}/${NAME}/include/${DIR}" ] && [ ! -e "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}" ] && continue
 
-	mkdir -p "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
-# TESTING
-  if [ "$DIR" != 'DIR_MARKERS' ]; then
-	[ "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
-	[ ! "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
-  fi
-done
+if [ -d "${DIR_PROF}/${NAME}/include" ] || [ -d "${DIR_PROF}/${NAME}/include.${PASS}" ]; then
+	echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
+	TEMP=''
+	for DIR in DIR_DEVMAN DIR_MARKERS DIR_SCRIPTS CFG_BIN CFG_DATA CFG_DATAROOT CFG_DOC CFG_DVI CFG_HTML CFG_INCLUDE CFG_INFO CFG_LIB CFG_LIBEXEC CFG_LOCALE CFG_LOCALSTATE CFG_MAN CFG_OLDINCLUDE CFG_PDF CFG_PS CFG_SBIN CFG_SHAREDSTATE CFG_SYSCONFIG CFG_MISC; do
+		# skip the processing of the directory if either of these two conditions are met
+		( [ "$(eval "echo \$$DIR")" = '' ] || [ "$DIR" = 'CFG_MISC' ] ) && continue
+		[ ! -e "${DIR_PROF}/${NAME}/include/${DIR}" ] && [ ! -e "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}" ] && continue
+
+		mkdir -p "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
+	# TESTING
+		if [ "$DIR" != 'DIR_MARKERS' ]; then
+			[ "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include.${PASS}/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
+			[ ! "$PASS" ] && cp -dpR "${DIR_PROF}/${NAME}/include/${DIR}/"* "${DIR_DUMP}/${NAME}/$(eval "echo \$$DIR")" 2>>"$LOG"
+		fi
+	done
+fi
+
 
 [ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.compile" ] && {											# execute any existing post-compile script (for single-pass; multi-pass is next line)
 	echo -e "\nExecuting the 'post.compile' script..." | tee -a "$LOG"
@@ -1959,22 +1979,32 @@ fi
 
 # OPTIONAL MULTI-PASS CALL
 
-[ "$PASS" ] && {
+if [ "$PASS" ]; then
+	[ -x "${DIR_PROF}/${NAME}/pre.pass.${PASS}" ] && {
+		echo -e "\nExecuting the 'pre.pass' script..." | tee -a "$LOG"
+		"${DIR_PROF}/${NAME}/pre.pass.${PASS}" 2>>"$LOG" || stop failed
+	}
+
 	echo -e "\nStarting the next pass..." | tee -a "$LOG"
+
 # passed D P F T lib U alsa
 # LEFT OFF - if any of these are in the 'params' or 'params.*' files, then do NOT include them below!
 
 
 	TEMP="$THIS -A $ARCH"									# since this value can NOT change, add it in no matter what
 	#[ "$PASS" ] && TEMP="$TEMP -N $PASS"							  NOTE: we do NOT pass this value here since it will be picked up automatically at the top of the script
-	( ! grep -q ^'METHOD=' "${DIR_PROF}/${NAME}/params"* ) && TEMP="$TEMP -M $METHOD"	# if this parameter is NOT in any of the param files, then it was either the default value -or- passed via command line, so we need to keep that value
-	( ! grep -q ^'SOURCE=' "${DIR_PROF}/${NAME}/params"* ) && [ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"				# all of these values follow the above comment
-	( ! grep -q ^"DIRS=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$DIRS" ] && TEMP="$TEMP -D"
-	( ! grep -q ^"PATCH=['']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$PATCH" ] && TEMP="$TEMP -P"
-	( ! grep -q ^"SKIP=['']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$SKIP" ] && TEMP="$TEMP -F"
-	( ! grep -q ^"SINGLE=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params"* ) && [ "$SINGLE" ] && TEMP="$TEMP -S"
-	( ! grep -q ^'TRIM=' "${DIR_PROF}/${NAME}/params"* ) && [ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
-	( ! grep -q ^'TYPE=' "${DIR_PROF}/${NAME}/params"* ) && [ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
+# TESTING
+  if [ -e "${DIR_PROF}/${NAME}/params.${PASS}" ]; then
+	# if this parameter is NOT in a general param or param.PASS file, then it was either the default value -or- passed via command line, so we need to keep that value
+	( ! grep -q ^'METHOD=' "${DIR_PROF}/${NAME}/params" ) && ( ! grep -q ^'METHOD=' "${DIR_PROF}/${NAME}/params.${PASS}" ) && TEMP="$TEMP -M $METHOD"
+	( ! grep -q ^'SOURCE=' "${DIR_PROF}/${NAME}/params" ) && ( ! grep -q ^'SOURCE=' "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ "$SOURCE" != '' ] && TEMP="$TEMP -C $SOURCE"
+	( ! grep -q ^"DIRS=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params" ) && ( ! grep -q ^"DIRS=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ "$DIRS" ] && TEMP="$TEMP -D"
+	( grep -q ^"PATCH=['']*"$ "${DIR_PROF}/${NAME}/params" ) && ( grep -q ^"PATCH=['']*"$ "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ "$PATCH" ] && TEMP="$TEMP -P"
+	( grep -q ^"SKIP=['']*"$ "${DIR_PROF}/${NAME}/params" ) && ( grep -q ^"SKIP=['']*"$ "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ ! "$SKIP" ] && TEMP="$TEMP -F"
+	( ! grep -q ^"SINGLE=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params" ) && ( ! grep -q ^"SINGLE=[']*TRUE[']*" "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ "$SINGLE" ] && TEMP="$TEMP -S"
+	( ! grep -q ^'TRIM=' "${DIR_PROF}/${NAME}/params" ) && ( ! grep -q ^'TRIM=' "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ "$TRIM" ] && TEMP="$TEMP -R \"$TRIM\""
+	( ! grep -q ^'TYPE=' "${DIR_PROF}/${NAME}/params" ) && ( ! grep -q ^'TYPE=' "${DIR_PROF}/${NAME}/params.${PASS}" ) && [ "$TYPE" ] && TEMP="$TEMP -T $TYPE"
+  fi
 	TEMP="$TEMP -b $BUILD $NAME"				# NOTE: there's no need to encapsulate the NAME in quotes since it won't contain spaces
 
 # REMOVED 2026/04/01
@@ -1985,7 +2015,7 @@ fi
 echo -n "execing |$TEMP| press any key to continue... "
 read
 	exec $TEMP						# re-launch builder using the adjusted parameters
-}								# NOTE: exec will replace this invocation of the script with the above line	https://stackoverflow.com/questions/18351198/what-are-the-uses-of-the-exec-command-in-shell-scripts
+fi								# NOTE: exec will replace this invocation of the script with the above line	https://stackoverflow.com/questions/18351198/what-are-the-uses-of-the-exec-command-in-shell-scripts
 
 [ "$BUILD" = 'install' ] && echo -e "\nCongrats, the software has been compiled successfully!\n" | tee -a "$LOG"
 [ "$BUILD" = 'package' ] && echo -e "\nCongrats, the software has been packaged successfully!\n" | tee -a "$LOG"

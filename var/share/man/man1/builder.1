@@ -54,10 +54,11 @@ OPTIONS:
 4.  ACTIONS
 5.  OPTIONS
 6.  INFO FILE
-7.  EXAMPLES
-8.  BUGS
-9.  COPYRIGHT
-10. AUTHORS
+7.  ORDER OF OPERATIONS
+8.  EXAMPLES
+9.  BUGS
+10. COPYRIGHT
+11. AUTHORS
 
 
 
@@ -997,6 +998,41 @@ Any applicable comments for the package
 .B changes [Updated to the latest version]
 Brief list of changes between package releases
 
+
+
+
+.SH ORDER OF OPERATIONS
+
+Below we will list the order of operations that the builder script runs
+when compiling and optionally packaging software:
+
+     1.  Process [/usr/local]/etc/builder and ~/.[etc/]builder configs
+     2.  Adjust variable values via passed switches
+     3.  System checks (parameter values, file system, failed attempts)
+     4.  Install compile-time dependencies
+     5.  Optionally obtain the source code
+     6.  Optionally apply any patches			pwd=source code
+     7.  Execute pre.compile script			pwd=source code
+     8.  Generate compile process (configure)		pwd=source code
+     9.  Execute post.configure script			pwd=source code
+    10. Generate compile process (make *)		pwd=source code
+    11. Actually compile the software			pwd=source code
+    12. Copy in the 'extra' files			pwd=source code
+    13. Execute post.compile script			pwd=source code
+   14a. Install compiled software			pwd=source code
+   14b. Separate contents into individual packages	pwd=DIR_DUMP/NAME[.TYPE]
+	   NOTE: can be skipped if SKIP=TRUE
+        A. Apply file/directory ownership/permissions	pwd=DIR_DUMP/NAME[.TYPE]
+	   NOTE: will only be executed on the last pass
+        B. Execute pre.package script			pwd=DIR_DUMP
+	   NOTE: apply any final file/directory ownerships/permissions now
+        C. Create the various packages			pwd=DIR_DUMP
+        D. Copy the files into the local repo		pwd=DIR_DUMP
+        E. Execute post.package script			pwd=DIR_DUMP
+    20. Cleanup						pwd=DIR_DUMP
+    21. Execute pre.pass script				pwd=DIR_DUMP
+   22a. Initiate the next pass if requested
+   22b. Execute cleanup script as final command		pwd=DIR_DUMP
 
 
 

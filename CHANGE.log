@@ -328,18 +328,14 @@
 - Updated the config files
 - Updated conditions for calling 'make'
 
-
-
-
-- test burn still builds correctly
-- test alsa builds individually and together
-- Tested with TinyCore Linux
-
-automated updated checking (via .info file):
-Update: list (hashes the listing [like alsa] so when the hash changes, a trigger can prompt an alert)
-	link (checks a URL for a download link [e.g. the latest stable] value, triggering a prompt when changed)
-Check: the hash if 'list' is used, the <a> filename if 'link' is used
-
-The '-C dev' does not work for alsa
-cycle the profile if a user wants to build a particular type (e.g. only alsa-lib)
+2026/04/16
+- Added 'Order of Operations' to the man page
+- Added a pre.pass script call
+- Removed checking all params files for adjustments before the next pass
+- Updated valid param files (and values) are checked before passing switches to
+  the next pass
+- Updated a package() check with SKIP
+- Updated the alsa profile
+- Updated the pass logging
+- Updated the display of several actions verbiage
 
