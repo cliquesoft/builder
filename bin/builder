@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/16 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/21 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -254,22 +254,22 @@ stop() {
 			# files
 # REMOVED 2026/04/02 - this doesn't appear to be used any longer
 #			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
-			[ -e "${DIR_TEMP}/${DIR}.make" ] && rm -Rf "${DIR_TEMP}/${DIR}.make" 2>>"$LOG"
-			[ -e "${DIR_TEMP}/${DIR}.pass" ] && rm -Rf "${DIR_TEMP}/${DIR}.pass" 2>>"$LOG"
-			[ -e "${DIR_TEMP}/${DIR}.sort" ] && rm -Rf "${DIR_TEMP}/${DIR}.sort" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.make" ] && $SUDO rm -Rf "${DIR_TEMP}/${DIR}.make" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.pass" ] && $SUDO rm -Rf "${DIR_TEMP}/${DIR}.pass" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.sort" ] && $SUDO rm -Rf "${DIR_TEMP}/${DIR}.sort" 2>>"$LOG"
 			# NOTE: only delete these files if the pid doesn't match the current run
 			if [ -e "${DIR_TEMP}/${DIR}.pid" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ]; then
-				[ -e "${DIR_TEMP}/${NAME}.pass" ] && rm -Rf "${DIR_TEMP}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
-				[ -e "${DIR_TEMP}/${NAME}.pid" ] && rm -Rf "${DIR_TEMP}/${NAME}.pid" 2>>"$LOG"
+				[ -e "${DIR_TEMP}/${NAME}.pass" ] && $SUDO rm -Rf "${DIR_TEMP}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
+				[ -e "${DIR_TEMP}/${NAME}.pid" ] && $SUDO rm -Rf "${DIR_TEMP}/${NAME}.pid" 2>>"$LOG"
 			fi
 
 			# directories
 			rm -Rf "${DIR_TEMP:?}/${DIR}/"* 2>>"$LOG"
 
-			[ -d "${DIR_DUMP:?}/${DIR}" ] && rm -Rf "${DIR_DUMP:?}/${DIR}/"* 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
-			for PACK in bin dev doc drv gir lib loc; do
+			[ -d "${DIR_DUMP:?}/${DIR}" ] && $SUDO rm -Rf "${DIR_DUMP:?}/${DIR}/"* 2>>"$LOG" # since the directory might not be renamed to DIR_DUMP.bin yet
+			for PACK in bin cfg dev doc drv gir lib loc msc plg; do
 				if [ -d "${DIR_DUMP:?}/${DIR}.${PACK}" ]; then
-					rm -Rf "${DIR_DUMP:?}/${DIR}.${PACK}" 2>>"$LOG" || {
+					$SUDO rm -Rf "${DIR_DUMP:?}/${DIR}.${PACK}" 2>>"$LOG" || {
 						echo "ERROR: This step failed to complete, check the log for details."
 						exit 1
 					}
@@ -297,7 +297,7 @@ pass() {
 [ -e "${DIR_TEMP}/${NAME}.pass" ] && echo "NAME.pass DOES exist... |$$|$(cat "${DIR_TEMP}/${NAME}.pid")|"
 ( [ -e "${DIR_TEMP}/${NAME}.pass" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] ) && echo 'there was a failed prior attempt...'
 
-	# if there are no passes (or no passes have been made yet (e.g. this is the initial invocation)) -OR- the multi-pass file exists -AND- the script pid doesn't equal the recorded one, then...
+	# if there are no passes (or no passes have been made yet - this is the initial invocation) -OR- the multi-pass file exists -AND- the script pid doesn't equal the recorded one, then...
 	if [ ! -e "${DIR_TEMP}/${NAME}.pass" ] || ( [ -e "${DIR_TEMP}/${NAME}.pass" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] ); then
 [ "$2" ] && echo "a file was passed |$2|"
 echo "checking for |${DIR_PROF}/${NAME}/${2}.1|"
@@ -315,12 +315,20 @@ return						# if no FILE exist, nor a NAME.pass, then this isn't a multi-pass pr
 	fi
 echo 'pass() process'
 	PASS="$(cat "${DIR_TEMP}/${NAME}.pass")"
+echo "pass (whole) |$PASS|"
 	TEMP=${PASS%|*}										#   store the total passes required
 	PASS=${PASS#*|}										#   store the prior pass value
+echo "pass (isolated) |$PASS|"
 #	[ "$1" = 'INC' ] && PASS=$(( PASS + 1 ))						#   increase the value by 1 if instructed to
 	PASS=$(( PASS + 1 ))									#   increase the value by 1 if instructed to
+echo "pass (incremented) |$PASS|"
 	[ $PASS -gt $TEMP ] && stop proper							#   if we have just completed the last requred pass, then cleanup and exit
-	[ "$1" = 'INC' ] && echo "$TEMP|$PASS" >"${DIR_TEMP}/${NAME}.pass"			#   if we've made it here, we still have at least one pass to perform, so update the values!
+echo 'not last pass'
+	[ "$1" = 'inc' ] && {
+echo "$TEMP|$PASS" >"${DIR_TEMP}/${NAME}.pass"			#   if we've made it here, we still have at least one pass to perform, so update the values!
+cat "${DIR_TEMP}/${NAME}.pass"
+}
+echo done
 }
 
 
@@ -447,7 +455,7 @@ package() {
 # UPDATED 2026/04/08
 #				chmod $PRM_EXECS bin/* sbin/* usr/bin/* usr/sbin/* usr/local/bin/* usr/local/sbin/* 2>/dev/null			# update these directory contents to be executable
 				chmod $PRM_EXECS ${CFG_BIN}/* ${CFG_SBIN}/* 2>/dev/null								# update these directory contents to be executable
-				eval "$SUDO chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>\"$LOG\" 2>&1"						# update the ownership of all the package contents
+				eval "$SUDO chown -hR ${OWN_USER}:${OWN_GROUP} ./* >>\"$LOG\" 2>/dev/null"					# update the ownership of all the package contents
 			done
 		done
 
@@ -586,7 +594,9 @@ if ( ! echo "$@" | grep -q '\-u ' ); then							# if we're not uninstalling a pr
 echo 'uninstall was NOT passed'
 	TEMP=''
 	pass 'init' 'config'										# check if we have a multi-pass profile
-	[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/config" ] && {
+# UPDATED 2026/04/21
+#	[ ! "$PASS" ] && [ -e "${DIR_PROF}/${NAME}/config" ] && {
+	[ -e "${DIR_PROF}/${NAME}/config" ] && {
 echo 'reading in config file'
 . "${DIR_PROF}/${NAME}/config"		# Profile config
 }
@@ -1010,6 +1020,13 @@ else												# otherwise it was NOT passed, so...
 	[ "$DOWNLOAD" ] && cd "$DIR_PROF"							#   change into the default download location
 	[ "$INSTALL" ] && cd "$DIR_PROF"							#   ditto
 fi
+
+
+
+
+# GET/SET THE 'SUDO', 'PID', AND 'PASS' VALUES				  NOTE: the DIR_TEMP value will already be (re)set by this point
+
+( [ "$SUDO" = 'TRUE' ] || [ "$SUDO" = '1' ] ) && SUDO='sudo'	# update the value to be the binary name so we can use it like "$SUDO mv ..."	NOTE: to use 'sudo' with parameters, simply add them for the SUDO value in the /etc/builder/config file (e.g. SUDO='sudo -x -y -z')
 
 
 
@@ -1459,10 +1476,9 @@ fi
 
 
 
-# GET/SET THE 'SUDO', 'PID', AND 'PASS' VALUES				  NOTE: the DIR_TEMP value will already be (re)set by this point
+# GET/SET THE 'PID' AND 'PASS' VALUES				  NOTE: the DIR_TEMP value will already be (re)set by this point
 
-( [ "$SUDO" = 'TRUE' ] || [ "$SUDO" = '1' ] ) && SUDO='sudo'	# update the value to be the binary name so we can use it like "$SUDO mv ..."	NOTE: to use 'sudo' with parameters, simply add them for the SUDO value in the /etc/builder/config file (e.g. SUDO='sudo -x -y -z')
-echo "$$" >"${DIR_TEMP}/${NAME}.pid"				# used to indicate if we're on successful multi-pass or restarting after a failure
+[ ! -e "${DIR_TEMP}/${NAME}.pid" ] && echo "$$" >"${DIR_TEMP}/${NAME}.pid"			# used to indicate if we're on successful multi-pass or restarting after a failure
 
 # UPDATED 2026/03/31
 #[ -e "${DIR_TEMP}/${NAME}.pass" ] && {				# if we are on one of the multi-passes, then...    WARNING: this has to be processed in this order -AND- do NOT test for PASS value since it does NOT get passed on subsequent calls!

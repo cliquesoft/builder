@@ -339,3 +339,10 @@
 - Updated the pass logging
 - Updated the display of several actions verbiage
 
+2026/04/21
+- Added cfg, msc, and plg to stop()
+- Updated the alsa profile
+- Updated where SUDO is processed
+- Updated the profile config file processing
+- Updated the 'INC' value in pass()
+
