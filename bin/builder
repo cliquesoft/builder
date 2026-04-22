@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/21 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/22 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -170,7 +170,7 @@ export URL_CODE=''						# the developer URL used to obtain the package source co
 
 export CUSTOM=''						# used when METHOD='custom'
 
-export DIR_DEVMAN="/etc/udev/rules.d"				# location for device manager files
+export DIR_DEVMAN="/etc/mdev/rules.d"				# location for device manager files
 export DIR_MARKERS="${DIR_INST}/var/cache/software"		# location for package markers
 export DIR_SCRIPTS="${DIR_INST}/etc/init.d"			# location for package start/stop scripts
 
@@ -380,6 +380,8 @@ package() {
 		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | grep ^"${NAME}")"			# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 												# (this is useful for a single package that gets turned into multiple like php > php-cgi, php-dev, php-ext, php-fpm, ...)
 		echo -e "\nSeparating into various packages..." | tee -a "$LOG"
+echo -n "check DUMP, press ENTER to continue |$NAMES|... "
+read
 		for DIR in $NAMES; do
 			[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$DIR\"" | tee -a "$LOG"
 
@@ -419,8 +421,13 @@ package() {
 			# get rid of all empty directories from the 'bin' package
 			find "$DIR" -type d -empty -delete 2>/dev/null
 
-			# anything left should be binaries, so rename the directory
-			[ -e "$DIR" ] && mv "$DIR" "${DIR}.bin"					# adjust the name so it can be included in the 'for' loop below		NOTE: test first incase the package only contains libs (which will erase this directory on the line above)
+			# anything left should be binaries, so rename the directory (if this is the first pass or no multi-pass)
+			[ -e "$DIR" ] && [ ! -e "${DIR}.bin" ] && mv "$DIR" "${DIR}.bin"	# adjust the name so it can be included in the 'for' loop below		NOTE: test first incase the package only contains libs (which will erase this directory on the line above)
+			# if the .bin directory already exists, move the contents
+			[ -e "$DIR" ] && [ -e "${DIR}.bin" ] && {
+				find "$DIR" -type f -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.bin\" '{}'" \; 2>/dev/null
+				rm -Rf "$DIR"
+			}
 		done
 
 		TEMP='bin cfg dev doc drv gir lib loc msc plg'					# store all the directories the files were separated into
@@ -1893,6 +1900,8 @@ chmod 775 "${DIR_TEMP}/${NAME}${EXT_MAKE}"
 echo -e "\nCompiling the software..." | tee -a "$LOG"
 "${DIR_TEMP}/${NAME}${EXT_MAKE}" || stop failed
 
+echo -n "DEBUG check DUMP... "
+read
 
 if [ -d "${DIR_PROF}/${NAME}/include" ] || [ -d "${DIR_PROF}/${NAME}/include.${PASS}" ]; then
 	echo -e "\nCopying in the 'include' files..." | tee -a "$LOG"
@@ -1911,6 +1920,8 @@ if [ -d "${DIR_PROF}/${NAME}/include" ] || [ -d "${DIR_PROF}/${NAME}/include.${P
 	done
 fi
 
+echo -n "DEBUG check DUMP... "
+read
 
 [ ! "$PASS" ] && [ -x "${DIR_PROF}/${NAME}/post.compile" ] && {											# execute any existing post-compile script (for single-pass; multi-pass is next line)
 	echo -e "\nExecuting the 'post.compile' script..." | tee -a "$LOG"

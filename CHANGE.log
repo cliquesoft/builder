@@ -346,3 +346,7 @@
 - Updated the profile config file processing
 - Updated the 'INC' value in pass()
 
+2026/04/22
+- Updated the alsa profile
+- Updated the movement of NAME to NAME.bin in package() separation
+
