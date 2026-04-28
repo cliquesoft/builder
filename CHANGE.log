@@ -350,3 +350,10 @@
 - Updated the alsa profile
 - Updated the movement of NAME to NAME.bin in package() separation
 
+2026/04/23
+- Updated the alsa profile
+
+2026/04/28
+- Updated the alsa profile to remove plugins
+- Updated the package separation code
+

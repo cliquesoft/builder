@@ -372,17 +372,24 @@ package() {
 		chmod 775 "${DIR_TEMP}/${NAME}.sort"
 
 		# store the package names that need to be processed (either NAME or directory names)
-		[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"					# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
-		[ ! "$DIRS" ] && [ "$TRIM" ] && {						# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
+# UPDATED 2026/04/28 - separation does need to take place here even if DIRS!=''
+#		[ ! "$DIRS" ] && [ ! "$TRIM" ] && NAMES="$NAME"					# if we are not packaging all the directories found in DIR_DUMP -AND- no trimming should be applied, then just store the name of the requested package
+#		[ ! "$DIRS" ] && [ "$TRIM" ] && {						# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
+		[ ! "$TRIM" ] && NAMES="$NAME"							# if no trimming should be applied, then just store the name of the requested package
+		[ "$TRIM" ] && {								# same as above, but with trimming any portion of the name along with the actual renaming of the directory to match
 			NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
 			mv "$NAME" "$NAMES" 2>>"$LOG"
 		}
-		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | grep ^"${NAME}")"			# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+#
+#		[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | grep ^"${NAME}")"			# otherwise, we are to store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 												# (this is useful for a single package that gets turned into multiple like php > php-cgi, php-dev, php-ext, php-fpm, ...)
+# TESTING
+#if [ ! "$DIRS" ]; then			# if we're NOT using custom-named directories, then we need to separate into various packages
 		echo -e "\nSeparating into various packages..." | tee -a "$LOG"
 echo -n "check DUMP, press ENTER to continue |$NAMES|... "
 read
-		for DIR in $NAMES; do
+#		for DIR in $NAMES; do
+DIR=$NAMES	# left off - we need to replace {DIR} below with {NAMES} since we are no longer cycling NAMES
 			[ $DEBUG -gt 0 ] && echo "   DEBUG (Processing): \"$DIR\"" | tee -a "$LOG"
 
 			# strip the debug symbols from the just-compiled software		  https://superuser.com/questions/236601/how-do-i-execute-multiple-commands-when-using-find
@@ -428,7 +435,8 @@ read
 				find "$DIR" -type f -exec /bin/sh -c "\"${DIR_TEMP}/${NAME}.sort\" \"${DIR}.bin\" '{}'" \; 2>/dev/null
 				rm -Rf "$DIR"
 			}
-		done
+#		done
+#fi
 
 		TEMP='bin cfg dev doc drv gir lib loc msc plg'					# store all the directories the files were separated into
 	fi
