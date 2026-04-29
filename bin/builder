@@ -2,7 +2,7 @@
 # builder	a small script to build software for Linux distros
 #
 # Created	2017/07/08 by Dave Henderson (support@cliquesoft.org)
-# Updated	2026/04/22 by Dave Henderson (support@cliquesoft.org)
+# Updated	2026/04/29 by Dave Henderson (support@cliquesoft.org)
 #
 # License	2-clause BSD License
 #		https://en.wikipedia.org/wiki/BSD_licenses#2-clause_license_.28.22Simplified_BSD_License.22_or_.22FreeBSD_License.22.29
@@ -244,9 +244,9 @@ stop() {
 		rm -Rf "${DIR_DUMP:?}/${NAME}/"* 2>>"$LOG"	# NOTE: the ':?' prevents the expression from evaluating to 'rm /*'
 		rm -Rf "${DIR_TEMP:?}/${NAME}/"* 2>>"$LOG"
 # REMOVED 2026/04/02 - this can't be removed since this is called between passes
-#		rm -Rf "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"
-		rm -Rf "${DIR_TEMP:?}/${DIR}.make" 2>>"$LOG"
-		rm -Rf "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
+#		rm -f "${DIR_TEMP:?}/${NAME}.pass" 2>>"$LOG"
+		rm -f "${DIR_TEMP:?}/${DIR}.make" 2>>"$LOG"
+		rm -f "${DIR_TEMP:?}/${DIR}.sort" 2>>"$LOG"
 		( [ ! "$2" ] || [ $2 -eq 1 ] ) && exit 1
 	elif [ "$1" = 'proper' ]; then
 		[ ! "$NAMES" ] && NAMES="$NAME"			# if the 'packaging' stage hasn't been reached yet, the only directory that would possibly exist would just be NAME
@@ -254,13 +254,13 @@ stop() {
 			# files
 # REMOVED 2026/04/02 - this doesn't appear to be used any longer
 #			rm -Rf "${DIR_TEMP:?}/${DIR}.build" 2>>"$LOG"
-			[ -e "${DIR_TEMP}/${DIR}.make" ] && $SUDO rm -Rf "${DIR_TEMP}/${DIR}.make" 2>>"$LOG"
-			[ -e "${DIR_TEMP}/${DIR}.pass" ] && $SUDO rm -Rf "${DIR_TEMP}/${DIR}.pass" 2>>"$LOG"
-			[ -e "${DIR_TEMP}/${DIR}.sort" ] && $SUDO rm -Rf "${DIR_TEMP}/${DIR}.sort" 2>>"$LOG"
-			# NOTE: only delete these files if the pid doesn't match the current run
-			if [ -e "${DIR_TEMP}/${DIR}.pid" ] && [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ]; then
-				[ -e "${DIR_TEMP}/${NAME}.pass" ] && $SUDO rm -Rf "${DIR_TEMP}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
-				[ -e "${DIR_TEMP}/${NAME}.pid" ] && $SUDO rm -Rf "${DIR_TEMP}/${NAME}.pid" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.make" ] && $SUDO rm -f "${DIR_TEMP}/${DIR}.make" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.pass" ] && $SUDO rm -f "${DIR_TEMP}/${DIR}.pass" 2>>"$LOG"
+			[ -e "${DIR_TEMP}/${DIR}.sort" ] && $SUDO rm -f "${DIR_TEMP}/${DIR}.sort" 2>>"$LOG"
+			# NOTE: only delete these files if the pid doesn't match the current run -OR- we're done with the last pass
+			if [ -e "${DIR_TEMP}/${DIR}.pid" ] && ( [ $$ -ne $(cat "${DIR_TEMP}/${NAME}.pid") ] || [ $PASS -eq $(cat "${DIR_TEMP}/${NAME}.pass" | sed 's/|.*//') ] ); then
+				[ -e "${DIR_TEMP}/${NAME}.pass" ] && $SUDO rm -f "${DIR_TEMP}/${NAME}.pass" 2>>"$LOG"				# delete this file if it was from a different script run, NOT from a previous pass
+				[ -e "${DIR_TEMP}/${NAME}.pid" ] && $SUDO rm -f "${DIR_TEMP}/${NAME}.pid" 2>>"$LOG"
 			fi
 
 			# directories
@@ -516,7 +516,7 @@ echo 'oops! packaging'
 		NAMES="$(echo "$NAME" | sed "s/${TRIM}//")"
 		eval "$SUDO mv \"$NAME\" \"$NAMES\" 2>>\"$LOG\""
 	}
-	[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' | sort -u)"		# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
+	[ "$DIRS" ] && NAMES="$(ls -1 "$DIR_DUMP" | sed 's/\.[^\.]*$//' |sort -u|tr '\n' ' ')"	# otherwise, we are so store all the names of the directories before we create the .bin, .dev, .drv, etc related directories
 	[ $DEBUG -gt 0 ] && echo "   DEBUG (NAMES): \"$NAMES\""
 												# NOTE: list all contents | non-greedy sed to remove extension (e.g. .bin) | sort to remove duplicates
 	echo -e "\nCreating the various packages..." | tee -a "$LOG"
@@ -561,10 +561,17 @@ echo "markers |${DIR_PROF}/${NAME}/include.${PASS}/DIR_MARKERS/${PACKAGE}|${DIR_
 
 			[ "$SPM_MAKE" ] && { eval "$SPM_MAKE" || stop failed; }			# NOTE: we use a variable so any package manager can create a native package for their distro
 
-			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && echo -e "${DEP_EXEC_BIN}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
-			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && echo -e "${DEP_EXEC_DEV}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
-			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'gir' ] ) && [ "$DEP_EXEC_GIR" ] && echo -e "${DEP_EXEC_GIR}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
-			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'lib' ] ) && [ "$DEP_EXEC_LIB" ] && echo -e "${DEP_EXEC_LIB}\n" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+# if these are custom directories (e.g. alsa-config), then they have to create their own .deps file
+	if [ "$OLD_NAME" = "$NAME" ]; then
+echo "DEBUG: inside the deps file creation |$TYPE|"
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'bin' ] ) && [ "$DEP_EXEC_BIN" ] && {
+echo 'inside the .bin'
+eval "echo -e \"${DEP_EXEC_BIN}\n\"" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+}
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'dev' ] ) && [ "$DEP_EXEC_DEV" ] && eval "echo -e \"${DEP_EXEC_DEV}\n\"" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'gir' ] ) && [ "$DEP_EXEC_GIR" ] && eval "echo -e \"${DEP_EXEC_GIR}\n\"" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+			( [ "$TYPE" = 'all' ] || [ "$TYPE" = 'lib' ] ) && [ "$DEP_EXEC_LIB" ] && eval "echo -e \"${DEP_EXEC_LIB}\n\"" | tr ' ' '\n' >>"${DIR_REPO}/${PACKAGE}${PAK_DEPS}"
+	fi
 
 			mv "${PACKAGE}${PAK_SOFT}" "${PACKAGE}${PAK_LIST}" "${PACKAGE}${PAK_HASH}" "$DIR_REPO"
 		done

@@ -357,3 +357,9 @@
 - Updated the alsa profile to remove plugins
 - Updated the package separation code
 
+2026/04/29
+- Fixed a bug when processing directory names when packaging
+- Updated the alsa profile
+- Updated the man page to indicate placement of DEP_EXEC_*
+- Updated the deletion of .pid and .pass files when 'proper' is passed
+

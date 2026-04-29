@@ -541,6 +541,11 @@ be a space separated list of names.
 If a single distributable package is desired, each of these variables will
 be added to the .deps file to have the complete run-time list required for
 any aspect of the package to function properly.
+Also of note, if the builder profile has multiple passes, include all
+applicable values for this group of variables in the last config file. If
+there are packages that do not fall within the specified TYPE's (see the
+-t entry in the OPTION section below), their .dep file needs to be created
+manually using one of the executable scripts (typically post.package).
 
 .B DEP_EXEC_DEV
 Like DEP_EXEC_BIN, this package stores the development headers for this
@@ -790,7 +795,9 @@ into each directory. Be aware that the individual package separation will
 still take place and generate packages like php-cli-doc, php-cli-lib, etc,
 so make sure to place all the proper files into each directory. If there
 is a builder profile installed, you should not use this option without any
-modifications to the post.compile[.#] script mentioned above.
+modifications to the post.compile[.#] script mentioned above. Keep in mind
+that all custom named directories need to have a valid extension added to
+it (e.g. php-cgi.bin, .lib, .gir, ...) so processing occurs correctly.
 
 .B -F
 When creating packages, more often than not, the packaging should be done
